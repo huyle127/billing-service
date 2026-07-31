@@ -1,0 +1,511 @@
+// Prisma schema for the Billing Service.
+//
+// Models are added per phase, in the order set by the OpenSpec change
+// `build-billing-service`. Invariants that Prisma cannot express — partial
+// unique indexes, check constraints, and the providerSubscriptionId
+// immutability trigger — live in raw-SQL migrations alongside the generated
+// ones (design D6).
+//
+// The client is generated as TypeScript into `src/generated/prisma` so that
+// `nest build` compiles it into `dist` along with the rest of the service.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+  runtime      = "nodejs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Catalog (design D2)
+//
+// Mostly static, seeded, and the single place plan economics are defined. No
+// table here encodes a particular product: "AI" is a row in `products`, not a
+// column, an enum member, or a nullable-means-AI convention.
+// ---------------------------------------------------------------------------
+
+/// A recurring interval. Used for two independent things — a PricingOption's
+/// billing interval and a Plan's credit period — which is exactly why they are
+/// separate fields on separate models (design D4).
+enum BillingInterval {
+  MONTH
+  YEAR
+}
+
+/// The catalog root. Every Plan, add-on SKU, and credit record is attributable
+/// to exactly one Product.
+model Product {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Stable machine key, e.g. "ai". Data, not schema.
+  key       String   @unique
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  plans          Plan[]
+  addonPackages  AddonPackage[]
+  creditGrants   CreditGrant[]
+  subscriptions  Subscription[]
+  addonPurchases AddonPurchase[]
+  checkouts      SubscriptionCheckout[]
+
+  @@map("products")
+}
+
+/// Belongs to exactly one Product, and carries the credit policy: how much
+/// credit a period grants and how long a credit period lasts. Billing logic
+/// reads the amount from here rather than from a constant.
+model Plan {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String  @map("product_id") @db.Uuid
+  /// Stable machine key, unique within the Product, e.g. "free" / "pro".
+  key       String
+  name      String
+  /// Whether holding this plan counts as a *paid* subscription. Add-on
+  /// eligibility and add-on credit spendability both turn on this.
+  isPaid    Boolean @map("is_paid")
+
+  /// Credit policy. The credit period is the Plan's and is independent of any
+  /// PricingOption's billing interval — Pro Annual bills yearly and resets
+  /// monthly (design D4).
+  creditsPerPeriod          Int             @map("credits_per_period")
+  creditPeriodInterval      BillingInterval @map("credit_period_interval")
+  creditPeriodIntervalCount Int             @default(1) @map("credit_period_interval_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  product        Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  pricingOptions PricingOption[]
+  subscriptions  Subscription[]
+
+  @@unique([productId, key])
+  @@map("plans")
+}
+
+/// A purchasable SKU, mapping 1-to-1 to a Stripe Price. Carries the *billing*
+/// interval only.
+model PricingOption {
+  id                   String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  planId               String          @map("plan_id") @db.Uuid
+  billingInterval      BillingInterval @map("billing_interval")
+  billingIntervalCount Int             @default(1) @map("billing_interval_count")
+  /// Amount in the currency's minor units. Zero for Free, which is a real
+  /// Stripe Price on a $0 recurring amount (design D3).
+  unitAmount           Int             @map("unit_amount")
+  currency             String
+  stripePriceId        String          @unique @map("stripe_price_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  plan          Plan                   @relation(fields: [planId], references: [id], onDelete: Restrict)
+  subscriptions Subscription[]
+  checkouts     SubscriptionCheckout[]
+
+  @@unique([planId, billingInterval, billingIntervalCount])
+  @@map("pricing_options")
+}
+
+/// A one-time credit SKU, mapping 1-to-1 to a one-time Stripe Price. Never
+/// returned among the plan options a user can subscribe to.
+model AddonPackage {
+  id            String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId     String @map("product_id") @db.Uuid
+  key           String
+  name          String
+  /// Credits this SKU grants on successful payment. The grant amount is read
+  /// from here, never from the amount paid.
+  creditAmount  Int    @map("credit_amount")
+  unitAmount    Int    @map("unit_amount")
+  currency      String
+  stripePriceId String @unique @map("stripe_price_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  product        Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  addonPurchases AddonPurchase[]
+
+  @@unique([productId, key])
+  @@map("addon_packages")
+}
+
+// ---------------------------------------------------------------------------
+// Entitlement (design D2)
+//
+// Credit is held as grants with provenance, not as a balance column. A single
+// integer cannot answer "is this spendable right now", because spendability
+// depends on where the credit came from and on the current subscription state
+// — so provenance has to survive.
+//
+// The ledger is the source of truth; `amountRemaining` is an operational
+// projection of it that the check constraint guards and consumption locks.
+// ---------------------------------------------------------------------------
+
+enum CreditGrantSource {
+  SUBSCRIPTION
+  ADDON
+  ADJUSTMENT
+}
+
+/// A "reset" is not a type of its own: it appears in history as an EXPIRY of
+/// the outgoing period followed by an ALLOCATION for the new one.
+enum CreditTransactionType {
+  ALLOCATION
+  CONSUMPTION
+  EXPIRY
+  ADJUSTMENT
+}
+
+model CreditGrant {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String @map("user_id") @db.Uuid
+  productId String @map("product_id") @db.Uuid
+
+  source CreditGrantSource
+
+  amountInitial   Int @map("amount_initial")
+  /// Guarded by a `>= 0` check constraint, so no code path can overdraw.
+  amountRemaining Int @map("amount_remaining")
+
+  /// Drain order, lowest first. Stored rather than derived from the source, so
+  /// consumption orders by data instead of by a rule written into the query.
+  priority  Int
+  expiresAt DateTime? @map("expires_at")
+
+  /// The credit period this grant covers. Subscription-sourced grants always
+  /// have one — it is half the key that makes allocation once-per-period.
+  creditPeriodStart DateTime? @map("credit_period_start")
+  creditPeriodEnd   DateTime? @map("credit_period_end")
+
+  /// Origin: exactly one of these is set, according to `source`.
+  ///
+  /// Deliberately plain indexed columns rather than foreign keys. D6 does not
+  /// require referential integrity here, and a hard reference would couple
+  /// grant writes to subscription-row ordering in the webhook path — while the
+  /// one-live-row index would force credit fixtures to invent terminal
+  /// subscriptions purely to satisfy the constraint.
+  subscriptionId  String? @map("subscription_id") @db.Uuid
+  addonPurchaseId String? @map("addon_purchase_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  product      Product             @relation(fields: [productId], references: [id], onDelete: Restrict)
+  transactions CreditTransaction[]
+
+  @@index([userId, productId, amountRemaining])
+  @@index([subscriptionId])
+  @@map("credit_grants")
+}
+
+model CreditTransaction {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// Write order, and the only total order the ledger has.
+  ///
+  /// `createdAt` cannot serve: it defaults to the transaction timestamp, so
+  /// every row of one movement carries the same value and a uuid tiebreak would
+  /// order them arbitrarily. A running balance replayed in arbitrary order is
+  /// not a balance, so the sequence exists to make the replay deterministic.
+  sequence BigInt @unique @default(autoincrement())
+
+  /// Exactly one grant, enforced by being a single non-null column.
+  creditGrantId String @map("credit_grant_id") @db.Uuid
+
+  /// Groups the rows of one logical movement: a consumption draining three
+  /// grants writes three rows sharing an operation.
+  operationId String @map("operation_id") @db.Uuid
+
+  /// Set on exactly one row per operation — the row whose insert claims the
+  /// work. Unique, so a concurrent replay collides in the database rather than
+  /// spending twice.
+  idempotencyKey String? @unique @map("idempotency_key")
+
+  type CreditTransactionType
+
+  /// Signed: positive allocates, negative consumes or expires. This *is* the
+  /// balance impact; no separate authoritative column exists (C6).
+  amount Int
+
+  /// The grant's remaining amount immediately after this movement.
+  grantAmountRemainingAfter Int @map("grant_amount_remaining_after")
+
+  relatedEventType String? @map("related_event_type")
+  relatedEventId   String? @map("related_event_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  creditGrant CreditGrant @relation(fields: [creditGrantId], references: [id], onDelete: Restrict)
+
+  @@index([creditGrantId])
+  @@index([operationId])
+  @@map("credit_transactions")
+}
+
+// ---------------------------------------------------------------------------
+// Identity (design D2)
+//
+// Minimal here: enough to hang billing off and to hold the one Stripe Customer
+// a user may have. Credential storage and the login flow belong to the
+// authentication phase, which extends this model rather than replacing it.
+// ---------------------------------------------------------------------------
+
+model User {
+  id    String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email String @unique
+
+  /// Bcrypt-hashed password for authentication. Optional for backward compatibility.
+  passwordHash String? @map("password_hash")
+
+  /// At most one Stripe Customer per user, created on demand.
+  stripeCustomerId String? @unique @map("stripe_customer_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  subscriptions  Subscription[]
+  payments       Payment[]
+  addonPurchases AddonPurchase[]
+  creditGrants   CreditGrant[]
+  checkouts      SubscriptionCheckout[]
+  paymentMethods PaymentMethod[]
+
+  @@map("users")
+}
+
+/// A mirror of a payment method the provider holds, and nothing more.
+///
+/// Two properties define it, and both are deliberate:
+///
+/// - **It holds no card data.** Brand, last four, and expiry are descriptors a
+///   user needs to recognise their own card; a card number or security code is
+///   never received by this service, let alone stored.
+/// - **It follows provider state.** Rows are written from a confirmed provider
+///   response or a `payment_method.*` event, never ahead of one, and the
+///   provider — not this table — decides which method a charge uses.
+model PaymentMethod {
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+
+  /// The provider's identifier. Unique, so an attach response and the webhook
+  /// reporting the same attachment converge on one row rather than two.
+  providerPaymentMethodId String @unique @map("provider_payment_method_id")
+
+  /// Non-sensitive descriptors, as the provider reports them.
+  brand    String?
+  last4    String?
+  expMonth Int?    @map("exp_month")
+  expYear  Int?    @map("exp_year")
+
+  /// The provider's default for this customer, mirrored. At most one row per
+  /// user may be true, enforced by a partial unique index (design D2).
+  isDefault Boolean @default(false) @map("is_default")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@map("payment_methods")
+}
+
+// ---------------------------------------------------------------------------
+// Billing (design D2, D3)
+//
+// These tables mirror Stripe. Nothing here is a state the service invents.
+// ---------------------------------------------------------------------------
+
+/// Every Subscription is backed by a real provider subscription, Free included.
+enum BillingMode {
+  PROVIDER
+}
+
+/// Exactly the statuses Stripe reports for a subscription, and nothing else.
+/// There is no TERMINATED, no "downgraded", and no "pending cancellation":
+/// *live* and *terminal* are classifications over these values rather than
+/// values in their own right, and a pending cancellation is an intent field
+/// (design D0).
+enum SubscriptionStatus {
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+  PAUSED
+}
+
+enum PaymentType {
+  SUBSCRIPTION_RECURRING
+  ADDON_ONE_TIME
+}
+
+enum PaymentStatus {
+  SUCCEEDED
+  FAILED
+}
+
+enum AddonPurchaseStatus {
+  PENDING
+  COMPLETED
+}
+
+model Subscription {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String @map("user_id") @db.Uuid
+  productId String @map("product_id") @db.Uuid
+  planId    String @map("plan_id") @db.Uuid
+
+  pricingOptionId String @map("pricing_option_id") @db.Uuid
+
+  billingMode BillingMode @default(PROVIDER) @map("billing_mode")
+
+  /// 1-to-1 and permanent. A database trigger rejects any attempt to change a
+  /// non-null value, because "immutable" has to be true against a stray
+  /// updateMany or a manual psql session, not only against the repository.
+  providerSubscriptionId String @unique @map("provider_subscription_id")
+
+  /// A projection of what the provider reports. Never advanced locally.
+  status SubscriptionStatus
+
+  /// The pending period-end cancellation *intent*. A field on an otherwise
+  /// active row — modelling it as a status would invent a state Stripe does
+  /// not report and would break what the one-live-row index means.
+  cancelAtPeriodEnd Boolean @default(false) @map("cancel_at_period_end")
+
+  currentPeriodStart DateTime? @map("current_period_start")
+  currentPeriodEnd   DateTime? @map("current_period_end")
+
+  /// When the next credit period falls due. Diverges from the billing period
+  /// on an annual cycle, which is why the scheduled reset exists.
+  nextCreditResetAt DateTime? @map("next_credit_reset_at")
+
+  /// Stripe's dunning state, mirrored for observability only. Nothing local
+  /// schedules a retry from these.
+  paymentAttemptCount  Int       @default(0) @map("payment_attempt_count")
+  nextPaymentAttemptAt DateTime? @map("next_payment_attempt_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  product       Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  plan          Plan          @relation(fields: [planId], references: [id], onDelete: Restrict)
+  pricingOption PricingOption @relation(fields: [pricingOptionId], references: [id], onDelete: Restrict)
+  payments      Payment[]
+
+  @@index([userId, productId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+/// One row per payment attempt, successful or failed. Linked to a Subscription
+/// or to an add-on purchase, never both — enforced by a check constraint.
+model Payment {
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+
+  subscriptionId  String? @map("subscription_id") @db.Uuid
+  addonPurchaseId String? @map("addon_purchase_id") @db.Uuid
+
+  type   PaymentType
+  status PaymentStatus
+
+  amount   Int
+  currency String
+
+  providerInvoiceId       String? @map("provider_invoice_id")
+  providerPaymentIntentId String? @unique @map("provider_payment_intent_id")
+
+  /// Which attempt against `providerInvoiceId` this row records, mirrored from
+  /// the provider. It exists because Stripe retries one invoice up to three
+  /// times and each attempt is its own payment record: the invoice identifier
+  /// alone cannot identify an attempt. Null for a one-time add-on payment, which
+  /// has no invoice and is identified by its payment intent.
+  attemptNumber Int? @map("attempt_number")
+
+  failureReason String? @map("failure_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  subscription  Subscription?  @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  addonPurchase AddonPurchase? @relation(fields: [addonPurchaseId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([subscriptionId])
+  @@map("payments")
+}
+
+model AddonPurchase {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String @map("user_id") @db.Uuid
+  productId      String @map("product_id") @db.Uuid
+  addonPackageId String @map("addon_package_id") @db.Uuid
+
+  status AddonPurchaseStatus @default(PENDING)
+
+  providerCheckoutSessionId String? @unique @map("provider_checkout_session_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  addonPackage AddonPackage @relation(fields: [addonPackageId], references: [id], onDelete: Restrict)
+  payments     Payment[]
+
+  @@index([userId])
+  @@map("addon_purchases")
+}
+
+/// The correlation reference a subscription checkout leaves behind.
+///
+/// A checkout has no entitlement effect, so it writes no Subscription and no
+/// grant — but the webhook that later reports payment has to be attributable to
+/// the user, Product, and SKU that initiated it. This row is that reference and
+/// nothing more: it confers no entitlement and holds no provider state.
+model SubscriptionCheckout {
+  id              String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String @map("user_id") @db.Uuid
+  productId       String @map("product_id") @db.Uuid
+  pricingOptionId String @map("pricing_option_id") @db.Uuid
+
+  providerCheckoutSessionId String @unique @map("provider_checkout_session_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  product       Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  pricingOption PricingOption @relation(fields: [pricingOptionId], references: [id], onDelete: Restrict)
+
+  @@index([userId, productId])
+  @@map("subscription_checkouts")
+}
+
+/// A durable record of every event received, keyed by the provider's event id.
+/// Inserting the row *is* the idempotency claim — checking first would lose the
+/// race between two instances (design D5).
+model WebhookEvent {
+  id              String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerEventId String @unique @map("provider_event_id")
+  type            String
+
+  payload Json
+
+  receivedAt  DateTime  @default(now()) @map("received_at")
+  processedAt DateTime? @map("processed_at")
+
+  @@map("webhook_events")
+}

@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  // `prisma.config.ts` is CLI-only tooling and lives at the repo root. Leaving
+  // it in the program would widen the inferred rootDir past `src` and emit the
+  // entrypoint at `dist/src/main.js`, which `start:prod` does not look for.
+  "exclude": [
+    "node_modules",
+    "test",
+    "dist",
+    "prisma.config.ts",
+    "**/*spec.ts"
+  ]
+}
