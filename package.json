@@ -16,7 +16,10 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:generate": "prisma generate",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cov": "vitest run --coverage"
   },
   "keywords": [],
   "author": "",
@@ -46,14 +49,19 @@
   "devDependencies": {
     "@nestjs/cli": "^11.0.24",
     "@nestjs/schematics": "^11.1.0",
+    "@nestjs/testing": "^11.1.28",
+    "@swc/core": "^1.15.47",
     "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.6",
     "@types/node": "^26.1.2",
     "@types/passport-jwt": "^4.0.1",
     "@types/pg": "^8.20.3",
+    "@vitest/coverage-v8": "^4.1.10",
     "prisma": "^7.9.1",
     "ts-node": "^10.9.2",
     "tsx": "^4.23.5",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "unplugin-swc": "^1.5.10",
+    "vitest": "^4.1.10"
   }
 }

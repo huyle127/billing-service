@@ -40,11 +40,11 @@ Also to settle:
 **Free is a real Stripe subscription at a zero-amount recurring price, and every user gets a Stripe
 Customer — including users who never leave Free.** Recorded in requirements §3.
 
-This was decided ahead of ticket 015 rather than after it. That is a deliberate ordering, not an
-oversight, but it leaves one thing genuinely unverified: **whether a $0 recurring price emits
-`invoice.paid` every month for the life of the subscription.** The design does not depend on the
-answer; the *mechanism for monthly Free credits* does. If 015 finds the event does not recur, Free
-allocation must be driven by the same cron that serves annual subscriptions. Ticket 015 stays open.
+This was decided ahead of ticket 015 rather than after it. **Ticket 015 has since confirmed the
+assumption**: a $0 recurring price produces one invoice per month indefinitely and emits
+`invoice.paid` each time, with `billing_reason` of `subscription_create` on the first and
+`subscription_cycle` thereafter. Free-tier allocation rides the same path as paid plans and needs no
+separate scheduler. The bet paid off.
 
 Supporting evidence: the account already contains `price_1TyShMFaNFL0w4nvycCBFDng`, a $0 monthly
 price on product `AI Free`, so this matches the catalog that already exists.

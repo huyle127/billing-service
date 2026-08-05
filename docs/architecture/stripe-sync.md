@@ -112,9 +112,9 @@ window twice harmless.
 A partial index. This is the whole answer.
 
 ```sql
-CREATE INDEX subscriptions_pending_sync
-  ON subscriptions (sync_next_attempt_at)
-  WHERE stripe_subscription_id IS NULL
+CREATE INDEX "Subscription_pending_sync"
+  ON "Subscription" ("syncNextAttemptAt")
+  WHERE "stripeSubscriptionId" IS NULL
     AND status IN ('PENDING', 'ACTIVE', 'CANCELED', 'PAST_DUE');
 ```
 
@@ -126,11 +126,11 @@ scan lacks and the reason this design scales without a job table.
 The reconciler then reads:
 
 ```sql
-SELECT * FROM subscriptions
-WHERE stripe_subscription_id IS NULL
+SELECT * FROM "Subscription"
+WHERE "stripeSubscriptionId" IS NULL
   AND status IN ('PENDING','ACTIVE','CANCELED','PAST_DUE')
-  AND sync_next_attempt_at <= now()
-ORDER BY sync_next_attempt_at
+  AND "syncNextAttemptAt" <= now()
+ORDER BY "syncNextAttemptAt"
 LIMIT 50
 FOR UPDATE SKIP LOCKED;
 ```
@@ -168,6 +168,11 @@ behind to find, and detecting affected users would require scanning `users` — 
 the full-scan problem partial indexes solve.
 
 The partial indexes are in `prisma/sql/constraints.sql`, since Prisma cannot express them.
+
+**Identifier convention.** Table names match the Prisma model names exactly, so every identifier in
+hand-written SQL must be double-quoted. Postgres folds unquoted identifiers to lower case, and an
+unquoted `Subscription` resolves to a nonexistent `subscription` rather than failing loudly at the
+point of the mistake.
 
 ## 6. How webhooks update the database
 

@@ -33,6 +33,12 @@ that this effort fills.
 | Async pipeline | Postgres-backed queue over the `WebhookEvent` table, `FOR UPDATE SKIP LOCKED` |
 | Local infra | Neon only. No Docker, no Redis. |
 
+**Database identifiers match the Prisma model names exactly** — table `"CreditWallet"`, column
+`"subscriptionCredits"`. There are no `@@map` or `@map` directives. Consequence: **every identifier
+in hand-written SQL must be double-quoted**, because Postgres folds unquoted identifiers to lower
+case and an unquoted `CreditWallet` resolves to a nonexistent `creditwallet`. This has already
+caused one failure and will again if forgotten.
+
 **Migrations: always `prisma migrate`, never `prisma db push`.** `db push` produces no migration
 file, so the hand-written constraints in `prisma/sql/constraints.sql` — non-negative balances and
 the one-current-subscription index — would have nowhere to live and would never reach the database.
@@ -150,6 +156,28 @@ restructured Invoice, and silent version drift would break the credit cron. Rese
   them: all twelve behaved correctly. Notable snags: `constraints.sql` had to be rewritten for
   quoted camelCase columns, and **TypeScript 7.0 is incompatible with the Nest CLI** (no
   programmatic compiler API until 7.1) so the project is pinned to TS 6.
+- [006 Prototype atomic two-ledger consumption](tickets/006-prototype-atomic-consumption.md)
+  — the Prisma concern raised while charting is **closed**. Raced three strategies with 30
+  concurrent callers: **`SELECT … FOR UPDATE` wins**, a single conditional `UPDATE` ties it, and
+  **Serializable is rejected** — it lost 20 of 30 requests to unrecoverable serialization conflicts,
+  under-serving without any safety gain. Exposed a defect: each transaction is tied to one ledger,
+  so a consumption spanning both writes two rows, which a key-only unique made impossible. The
+  constraint is now **`@@unique([idempotencyKey, ledger])`**, migrated and verified by violation.
+- [010 Decide the testing strategy](tickets/010-decide-testing-strategy.md)
+  — [`strategy.md`](../testing/strategy.md) plus a **requirement checklist as the completion
+  criterion**, not a coverage threshold. **Vitest with `unplugin-swc`** — mandatory, since Vitest's
+  esbuild transform drops `emitDecoratorMetadata` that NestJS DI needs. Separate `billing_test`
+  database on the same Neon project, truncated per test, with a guard refusing to run if it matches
+  the development URL. **Transaction-rollback-per-test rejected** — consumption opens its own
+  transaction, so nesting breaks rollback, and concurrent tests need two connections anyway.
+  Harness proven: five tests passing.
+- [015 Prototype $0 recurring price and monthly `invoice.paid`](tickets/015-prototype-zero-price-invoice-paid.md)
+  — **confirmed**: a $0 recurring price produces one invoice per month indefinitely and emits
+  `invoice.paid` each time (`subscription_create` then `subscription_cycle`). Free-tier allocation
+  needs no separate scheduler, validating the bet made in ticket 014. Also found that the Invoice
+  object's **`paid` boolean now reads `undefined`** — falsy, so `if (invoice.paid)` would silently
+  never allocate. Use `status === 'paid'`. Confirmed directly that period fields live on the
+  subscription *item*.
 
 ## Not yet specified
 
@@ -189,9 +217,6 @@ Ruled beyond this destination. These never graduate.
 Frontier (open, unblocked, unclaimed):
 
 - [002 Provision Stripe test account and CLI](tickets/002-provision-stripe-test-account.md) — task — only `stripe listen` forwarding left
-- [006 Prototype atomic two-ledger consumption](tickets/006-prototype-atomic-consumption.md) — prototype
-- [010 Decide the testing strategy](tickets/010-decide-testing-strategy.md) — grilling
-- [015 Prototype $0 recurring price and monthly `invoice.paid`](tickets/015-prototype-zero-price-invoice-paid.md) — prototype
 
 Blocked:
 
@@ -201,14 +226,17 @@ Closed:
 
 - [001 Provision Neon and scaffold the repo](tickets/001-provision-neon-and-scaffold-repo.md) — task
 - [003 Research Stripe object model and webhook semantics](tickets/003-research-stripe-object-model.md) — research
+- [006 Prototype atomic two-ledger consumption](tickets/006-prototype-atomic-consumption.md) — prototype
 - [004 Design module boundaries and layering](tickets/004-design-module-boundaries.md) — grilling
 - [005 Amend requirements for auth scope override](tickets/005-amend-requirements-auth-scope.md) — task
 - [007 Design the persistence schema](tickets/007-design-persistence-schema.md) — grilling
 - [008 Decide plan and add-on package configuration](tickets/008-decide-plan-configuration.md) — grilling
 - [009 Design the auth module](tickets/009-design-auth-module.md) — grilling
+- [010 Decide the testing strategy](tickets/010-decide-testing-strategy.md) — grilling
 - [011 Design the API surface and error model](tickets/011-design-api-surface.md) — grilling
 - [012 Correct the requirements and domain model from Stripe research](tickets/012-correct-docs-from-stripe-research.md) — task
 - [013 Decide the Stripe-to-domain status mapping](tickets/013-decide-stripe-status-mapping.md) — grilling
 - [014 Decide Free plan modelling](tickets/014-decide-free-plan-modelling.md) — grilling
+- [015 Prototype $0 recurring price and monthly `invoice.paid`](tickets/015-prototype-zero-price-invoice-paid.md) — prototype
 - [016 Decide the credit allocation trigger and idempotency key](tickets/016-decide-credit-allocation-trigger.md) — grilling
 - [017 Design out-of-order webhook handling](tickets/017-design-out-of-order-webhook-handling.md) — grilling

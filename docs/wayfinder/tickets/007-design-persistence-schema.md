@@ -84,6 +84,16 @@ module drives, breaking table ownership and creating a dependency cycle).
 
 **Money and credits are integers throughout** — cents and whole credits, never floats.
 
+**Naming convention, revised after review.** The schema originally mapped table names to snake_case
+while leaving columns camelCase — an inconsistent pairing that had already caused one failure, when
+`constraints.sql` was written against snake_case columns that did not exist. It is now uniform:
+**database identifiers match the Prisma model names exactly**, with no `@@map` or `@map`. The
+trade-off, accepted knowingly, is that all hand-written SQL must double-quote every identifier.
+
+Renaming was done with `ALTER TABLE … RENAME`, written by hand. Prisma's own diff for this change
+generates twelve `DROP TABLE` statements — it cannot detect renames, so accepting its output would
+have destroyed the data.
+
 **Constraints Prisma cannot express** live in `prisma/sql/constraints.sql`: non-negative balance
 checks, the one-current-subscription partial unique index, and non-negative catalog amounts. These
 must be appended to the initial migration. They are the invariants that survive concurrency;

@@ -927,8 +927,11 @@ Listed plainly rather than guessed:
 3. **Exhaustive event sequence for a plan change.** Stripe documents `customer.subscription.updated`
    and the proration invoice behaviour but gives no definitive ordered list. Must be observed
    empirically.
-4. **Whether a $0 recurring price emits a monthly `invoice.paid` indefinitely.** See implication G.
-   Load-bearing for the Free tier; verify before building on it.
+4. ~~**Whether a $0 recurring price emits a monthly `invoice.paid` indefinitely.**~~ **RESOLVED by
+   ticket 015 (2026-08-04):** yes. Verified with a test clock over three monthly advances — one
+   invoice per period, `invoice.paid` each time, `billing_reason` of `subscription_create` then
+   `subscription_cycle`. The probe also found that the Invoice object's `paid` boolean now reads
+   `undefined`; use `status === 'paid'`.
 5. **The `customer` field's exact value in a `payment_method.detached` payload.** Inferred, not
    documented on the pages read.
 6. **Whether `customer_balance_transaction.created` is a real event type.** It did not appear in the

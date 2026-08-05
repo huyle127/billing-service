@@ -85,7 +85,6 @@ model User {
   paymentMethods  PaymentMethod[]
   payments        PaymentTransaction[]
 
-  @@map("users")
 }
 
 model AuthCredential {
@@ -98,7 +97,6 @@ model AuthCredential {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("auth_credentials")
 }
 
 model BillingCustomer {
@@ -113,7 +111,6 @@ model BillingCustomer {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("billing_customers")
 }
 
 model Plan {
@@ -132,7 +129,6 @@ model Plan {
   subscriptions Subscription[]
 
   @@unique([code, cycle])
-  @@map("plans")
 }
 
 model AddonPackage {
@@ -147,7 +143,6 @@ model AddonPackage {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  @@map("addon_packages")
 }
 
 model Subscription {
@@ -178,7 +173,6 @@ model Subscription {
   @@index([status, nextCreditAt])
   @@index([status, planId, stripePriceId])
   @@index([stripeSubscriptionId])
-  @@map("subscriptions")
 }
 
 model SubscriptionEvent {
@@ -192,7 +186,6 @@ model SubscriptionEvent {
   subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@index([subscriptionId, occurredAt])
-  @@map("subscription_events")
 }
 
 model CreditWallet {
@@ -207,7 +200,6 @@ model CreditWallet {
   user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions CreditTransaction[]
 
-  @@map("credit_wallets")
 }
 
 model CreditTransaction {
@@ -218,7 +210,7 @@ model CreditTransaction {
   amount          Int
   balanceAfter    Int
   reason          String?
-  idempotencyKey  String?               @unique
+  idempotencyKey  String?
   reversesId      String?               @unique
   stripeInvoiceId String?
   periodStart     DateTime?
@@ -228,8 +220,8 @@ model CreditTransaction {
   reverses CreditTransaction? @relation("Reversal", fields: [reversesId], references: [id])
   reversal CreditTransaction? @relation("Reversal")
 
+  @@unique([idempotencyKey, ledger])
   @@index([walletId, createdAt])
-  @@map("credit_transactions")
 }
 
 model PaymentMethod {
@@ -247,7 +239,6 @@ model PaymentMethod {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@map("payment_methods")
 }
 
 model PaymentTransaction {
@@ -268,7 +259,6 @@ model PaymentTransaction {
 
   @@unique([stripeInvoiceId])
   @@index([userId, occurredAt])
-  @@map("payment_transactions")
 }
 
 model WebhookEvent {
@@ -284,5 +274,4 @@ model WebhookEvent {
   processedAt   DateTime?
 
   @@index([status, nextAttemptAt])
-  @@map("webhook_events")
 }

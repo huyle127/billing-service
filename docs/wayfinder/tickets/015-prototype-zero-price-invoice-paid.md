@@ -3,9 +3,9 @@
 <!-- parent: map-billing-service-build.md -->
 <!-- label: wayfinder:prototype -->
 <!-- mode: HITL -->
-<!-- status: open -->
+<!-- status: closed (2026-08-04) -->
 <!-- assignee: -->
-<!-- blocked-by: 002 -->
+<!-- blocked-by: -->
 
 ## Question
 
@@ -40,4 +40,47 @@ unconfirmed items, or a linked file. Resolving this unblocks 014.
 
 ## Answer
 
-_Unresolved._
+**Confirmed: a $0 recurring price generates an invoice and emits `invoice.paid` every month.**
+
+Probed against `price_1TyShMFaNFL0w4nvycCBFDng` with a Stripe test clock, advancing three monthly
+periods.
+
+| Point in time | Invoice | `billing_reason` | `invoice.paid` |
+| --- | --- | --- | --- |
+| Subscription created | yes | `subscription_create` | fired |
+| Month 1 | yes | `subscription_cycle` | fired |
+| Month 2 | yes | `subscription_cycle` | fired |
+| Month 3 | yes | `subscription_cycle` | fired |
+
+The subscription remained `active` throughout and the item period advanced by one month each time.
+Four invoices for creation plus three cycles — exactly one per period, no gaps.
+
+**This validates ticket 014.** Free was decided to be a real Stripe subscription before this
+evidence existed; the assumption underneath it holds. Free-tier credits ride on `invoice.paid` and
+need no separate cron.
+
+### Findings that change how the code must be written
+
+**`invoice.paid` as a boolean field is gone.** The probe read `invoice.paid` and got `undefined`
+while `invoice.status` was `'paid'`. Recent API versions removed the field — consistent with ticket
+003's finding that Basil restructured Invoice.
+
+This is a silent failure waiting to happen: `undefined` is falsy, so `if (invoice.paid)` never
+grants credits and never raises an error. **Check `invoice.status === 'paid'`.** The event type
+`invoice.paid` still exists and fires normally; only the object field is affected.
+
+**`current_period_start` and `current_period_end` are on the subscription item**, not the
+subscription. Confirmed directly — the probe read them from `subscription.items.data[0]`. This is
+ticket 003's implication A observed rather than inferred.
+
+**`invoice.upcoming` fires on each cycle** and is not in the eight core events listed in
+requirements §5. Harmless, but it will appear in the `WebhookEvent` table if subscribed to.
+
+**`invoice.payment_succeeded` fires alongside `invoice.paid`** even for zero-amount invoices where
+no money moved. Both must not independently trigger allocation — the allocation key from ticket 016
+already covers this, but it is worth knowing the pair arrives together.
+
+### Method note
+
+Test clocks worked as documented and were adequate for this. The probe deletes its clock at the
+end, which removes the associated customer and subscription.

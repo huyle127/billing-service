@@ -3,9 +3,10 @@
 <!-- parent: map-billing-service-build.md -->
 <!-- label: wayfinder:grilling -->
 <!-- mode: HITL -->
-<!-- status: open -->
+<!-- status: closed (2026-08-04) -->
 <!-- assignee: -->
-<!-- blocked-by: 001, 003 -->
+<!-- output: docs/testing/strategy.md, docs/testing/requirement-coverage.md -->
+<!-- blocked-by: -->
 
 ## Question
 
@@ -48,4 +49,49 @@ Questions to resolve:
 
 ## Answer
 
-_Unresolved._
+Written to `docs/testing/strategy.md`, with the completion criterion tracked in
+`docs/testing/requirement-coverage.md`. The harness is installed and proven — five tests pass
+against the real test database.
+
+**Runner: Vitest with `unplugin-swc`.** Chosen over Jest for a project-specific reason: this
+codebase runs TypeScript 6 and already had to downgrade once around it. `ts-jest` tracks TypeScript
+releases and lags major versions; Vitest transforms through esbuild and swc and does not depend on
+the TypeScript compiler. **`unplugin-swc` is mandatory, not a nicety** — Vitest's default esbuild
+transform drops `emitDecoratorMetadata`, which NestJS constructor injection requires, and the
+resulting failure does not point at its cause.
+
+**Test database: a separate `billing_test` database on the same Neon project**, truncated before
+each test. Created with plain `CREATE DATABASE` rather than the Neon API, so no API key is needed.
+`test/setup.ts` refuses to run if the test URL is unset or matches the development one — the suite
+truncates every table, so a misconfiguration would destroy the development database rather than
+merely fail. Reference data (`Plan`, `AddonPackage`) is deliberately excluded from truncation.
+
+**Transaction-rollback-per-test was rejected**, and the reason is structural rather than aesthetic:
+credit consumption opens its own `$transaction`, so a test-owned outer transaction would nest and
+rollback would stop meaning what the test expects. Making it work would require threading a
+transaction client from the test down through the repository layer — bending production code to
+suit the harness. It also cannot express the most important test on that path, since concurrent
+consumption needs two connections and a single wrapping transaction forbids that.
+
+**Branch-per-run was rejected for now** — stronger isolation and parallel CI, but needs a Neon API
+key and orphans branches on failed teardown. The destination is a local service with no CI.
+
+**Definition of done: a requirement checklist, not a coverage threshold.** Feature-complete is a
+claim about requirements, not about lines executed; ninety percent coverage is compatible with
+mishandling the 3DS case entirely. Coverage is still measured, as a signal for finding untouched
+code.
+
+**Three layers.** Unit (no database, no Stripe) for domain rules. Integration (real test database,
+Stripe faked at the adapter seam) for anything involving transactions, constraints, or the webhook
+pipeline. Lifecycle (Stripe test clocks, sandbox-only) run deliberately rather than in the standard
+suite, because they are rate-limited, capped at two intervals per advance, and auto-deleted after
+thirty days.
+
+**Webhook tests construct and sign their own payloads** with the test signing secret — no network,
+deterministic, and able to produce the out-of-order sequences §5 requires the processor to tolerate.
+`stripe-mock` is unusable (stateless by design) and `stripe trigger` fires cascading real events, so
+it serves only as a signature-path smoke test.
+
+Five tests already pass and are recorded in the checklist, covering the non-negative balance
+constraint, the one-current-subscription rule, the pending-subscription coexistence case from
+ticket 013, and the composite idempotency key from ticket 006.

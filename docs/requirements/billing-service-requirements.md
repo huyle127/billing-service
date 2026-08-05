@@ -391,7 +391,9 @@ The key is an opaque string supplied by the caller. The credit ledger does not i
 
 The same mechanism serves consumption, where the calling application supplies its own key. Because credits are deducted before the caller's work runs, a retried request without a key would charge twice for one operation.
 
-Zero-amount invoices are auto-marked paid by Stripe and emit `invoice.paid` with no money moved. Free subscriptions do exist in Stripe, so Free credits arrive on this path; the allocation key is what stops them being granted twice when the same month was already credited at registration. A Payment Transaction is not recorded for a zero-amount invoice.
+Payment is determined by `invoice.status === 'paid'`, never by an `invoice.paid` field. That boolean was removed from the Invoice object in recent API versions and now reads as `undefined`, which is falsy — code branching on it would silently never allocate credits. The event type `invoice.paid` is unaffected and still fires.
+
+Zero-amount invoices are auto-marked paid by Stripe and emit `invoice.paid` with no money moved. This was verified empirically against a test clock: a zero-amount recurring price produces one invoice per month indefinitely, with `billing_reason` of `subscription_create` on the first and `subscription_cycle` thereafter. Free-tier credit allocation therefore rides on the same path as paid plans and needs no separate scheduler. Free subscriptions do exist in Stripe, so Free credits arrive on this path; the allocation key is what stops them being granted twice when the same month was already credited at registration. A Payment Transaction is not recorded for a zero-amount invoice.
 
 Credit consumption rules:
 
@@ -402,6 +404,10 @@ Credit consumption rules:
 - The caller supplies an **idempotency key** with every consumption. A retried request after a timeout must charge once, not twice.
 - If the caller's work fails after credits were deducted, the caller issues a **reversal**, which restores the credits to the ledger they were drawn from and is recorded as a Credit Transaction of type `reversal` linked to the original consumption. A consumption can be reversed at most once.
 - Reversal is distinct from `adjustment`, which remains admin-authorised and limited to Add-on Credits. Without it there would be no legitimate way to return Subscription Credits after a failed operation.
+
+Because each Credit Transaction is tied to exactly one ledger, a consumption that draws from both writes **one row per ledger**, sharing the caller's idempotency key. The uniqueness constraint is therefore on the key together with the ledger, not on the key alone.
+
+Consumption locks the wallet row with `SELECT … FOR UPDATE` and computes the split across ledgers before writing. Serializable isolation was measured as an alternative and rejected: under thirty concurrent callers it lost a third of legitimate consumptions to serialization conflicts that retry could not recover, without any compensating safety benefit.
 
 A decline is an ordinary outcome, not a system error. Because declines are reported with a success status code (see the API error model), the service **records a metric for every decline with its reason** — otherwise a user being continuously refused would be indistinguishable from a healthy system.
 

@@ -9,7 +9,7 @@ const prisma = new PrismaClient({
 const plans = [
   {
     code: 'free',
-    name: 'Free',
+    name: 'Free Monthly',
     cycle: BillingCycle.MONTHLY,
     monthlyCredits: 50,
     amountCents: 0,
@@ -17,7 +17,7 @@ const plans = [
   },
   {
     code: 'pro',
-    name: 'Pro',
+    name: 'Pro Monthly',
     cycle: BillingCycle.MONTHLY,
     monthlyCredits: 200,
     amountCents: 2000,
@@ -25,7 +25,7 @@ const plans = [
   },
   {
     code: 'pro',
-    name: 'Pro',
+    name: 'Pro Annual',
     cycle: BillingCycle.ANNUAL,
     monthlyCredits: 200,
     amountCents: 20000,

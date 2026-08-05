@@ -1,42 +1,46 @@
 -- Constraints that Prisma's schema language cannot express.
--- Applied as their own migration. Each one enforces an invariant that application code alone
--- cannot guarantee under concurrent access.
+-- Applied by migration ..._add_ledger_constraints; table and index names were later updated by
+-- ..._rename_tables_to_model_names. This file reflects the current shape and is the reference
+-- for anyone rebuilding the database from scratch.
 --
--- Column identifiers are quoted camelCase because the schema maps table names but not column
--- names. Unquoted snake_case will not resolve.
+-- Every identifier is quoted. Table names match the Prisma model names exactly, and Postgres
+-- folds unquoted identifiers to lower case -- an unquoted "CreditWallet" resolves to a
+-- nonexistent creditwallet and fails.
 
 -- 1. Credit balances can never go negative.
---    Requirements section 6 states consumption is atomic and never partial. Application
---    logic checks this too, but only the database can hold the line when two consume
---    requests race for the same wallet.
-ALTER TABLE credit_wallets
-  ADD CONSTRAINT credit_wallets_subscription_credits_non_negative
+--    Requirements section 6 states consumption is atomic and never partial. Application logic
+--    checks this too, but only the database can hold the line when two consume requests race
+--    for the same wallet. Measured under 30 concurrent callers in ticket 006.
+ALTER TABLE "CreditWallet"
+  ADD CONSTRAINT "CreditWallet_subscriptionCredits_non_negative"
   CHECK ("subscriptionCredits" >= 0);
 
-ALTER TABLE credit_wallets
-  ADD CONSTRAINT credit_wallets_addon_credits_non_negative
+ALTER TABLE "CreditWallet"
+  ADD CONSTRAINT "CreditWallet_addonCredits_non_negative"
   CHECK ("addonCredits" >= 0);
 
 -- 2. A user has exactly one current subscription.
---    "Current" means ACTIVE, CANCELED, or PAST_DUE. PENDING rows (payment authentication
---    in flight) and EXPIRED rows (history) are deliberately excluded, which is what allows
---    a pending Pro subscription to coexist with the active Free one it will replace.
-CREATE UNIQUE INDEX subscriptions_one_current_per_user
-  ON subscriptions ("userId")
+--    "Current" means ACTIVE, CANCELED, or PAST_DUE. PENDING rows (payment authentication in
+--    flight) and EXPIRED rows (history) are deliberately excluded, which is what allows a
+--    pending Pro subscription to coexist with the active Free one it will replace.
+CREATE UNIQUE INDEX "Subscription_one_current_per_user"
+  ON "Subscription" ("userId")
   WHERE status IN ('ACTIVE', 'CANCELED', 'PAST_DUE');
 
 -- 3. Catalog amounts are never negative.
-ALTER TABLE plans
-  ADD CONSTRAINT plans_amounts_non_negative
+ALTER TABLE "Plan"
+  ADD CONSTRAINT "Plan_amounts_non_negative"
   CHECK ("amountCents" >= 0 AND "monthlyCredits" >= 0);
 
-ALTER TABLE addon_packages
-  ADD CONSTRAINT addon_packages_amounts_non_negative
+ALTER TABLE "AddonPackage"
+  ADD CONSTRAINT "AddonPackage_amounts_non_negative"
   CHECK ("amountCents" >= 0 AND credits > 0);
 
 -- 4. Ledger idempotency.
---    Enforced by the unique on credit_transactions."idempotencyKey" declared in schema.prisma.
---    The key is an opaque string supplied by the caller; the credit module never interprets it.
+--    Enforced by the composite unique on "CreditTransaction" ("idempotencyKey", ledger),
+--    declared in schema.prisma and narrowed from a key-only unique by a later migration.
+--    The composite is required because each transaction is tied to exactly one ledger, so a
+--    consumption drawing from both writes two rows that must share the caller's key.
 --
 --    It serves two different operations:
 --      * Allocation -- billing supplies a key identifying the subscription and the month.
@@ -58,15 +62,15 @@ ALTER TABLE addon_packages
 --    still awaiting a Stripe object, so the reconciler's scan cost is proportional to the
 --    outstanding backlog rather than to table size. On a healthy system both indexes are
 --    nearly empty. Without them the sweep degrades into a full table scan as the service grows.
-CREATE INDEX billing_customers_pending_sync
-  ON billing_customers ("syncNextAttemptAt")
+CREATE INDEX "BillingCustomer_pending_sync"
+  ON "BillingCustomer" ("syncNextAttemptAt")
   WHERE "stripeCustomerId" IS NULL;
 
-CREATE INDEX subscriptions_pending_sync
-  ON subscriptions ("syncNextAttemptAt")
+CREATE INDEX "Subscription_pending_sync"
+  ON "Subscription" ("syncNextAttemptAt")
   WHERE "stripeSubscriptionId" IS NULL
     AND status IN ('PENDING', 'ACTIVE', 'CANCELED', 'PAST_DUE');
 
--- Deliberately NOT added: a unique constraint on subscriptions."stripeSubscriptionId".
+-- Deliberately NOT added: a unique constraint on "Subscription"."stripeSubscriptionId".
 -- Expired rows are retained as history and a Stripe subscription id can legitimately appear
 -- on more than one row across a plan change. An index is enough for lookup.
