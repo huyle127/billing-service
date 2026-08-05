@@ -30,6 +30,10 @@ function verdictOf(error: unknown): StripeFailureVerdict {
   return RETRYABLE_ERRORS.some((type) => error instanceof type) ? 'retryable' : 'permanent';
 }
 
+export function isMissingResource(error: unknown): boolean {
+  return error instanceof Stripe.errors.StripeInvalidRequestError && error.statusCode === 404;
+}
+
 export function classifyStripeError(
   error: unknown,
   operation: StripeOperation,

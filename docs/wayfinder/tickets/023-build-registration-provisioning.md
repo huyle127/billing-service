@@ -52,6 +52,12 @@ registers during a Stripe outage gets Free access and credits immediately; only 
 discards the second. Do not add a guard for this in application logic — the key already covers it,
 and a second mechanism would be a second thing to keep correct.
 
+**Inherited from ticket 020 — the internal API key.** 020 deferred it rather than build a guard whose
+only caller was a probe controller in a test. This ticket ships the first endpoint behind it, so it
+also builds `InternalKeyGuard` (timing-safe comparison against `INTERNAL_API_KEY`, already in
+configuration) and the service principal that carries **no user identifier of any kind** — make that
+unrepresentable in the type rather than rejected at runtime.
+
 ## Requirement clauses closed
 
 Section 3:
@@ -59,3 +65,8 @@ Section 3:
 - Registration grants plan and credits without contacting Stripe
 - Stripe customer and subscription provisioned immediately after registration
 - A subscription with no Stripe id is a valid intermediate state
+
+Section 9, inherited from ticket 020 now that an internal endpoint exists:
+
+- Internal key yields a service principal with no user identity
+- Internal endpoints reject "act on behalf of" semantics

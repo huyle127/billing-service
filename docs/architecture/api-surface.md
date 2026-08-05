@@ -47,6 +47,25 @@ decide behaviour has taken on business logic and belongs in a service.
 
 Validation failure is a client fault and returns `400`.
 
+## Authentication endpoints
+
+Public, except logout. Provided by the in-repo auth module, which is expected to be replaced by an
+upstream Authentication Service.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/v1/auth/register` | Create a user; returns the user, not a session |
+| `POST` | `/v1/auth/login` | Exchange email and password for an access and a refresh token |
+| `POST` | `/v1/auth/refresh` | Exchange a refresh token for a new pair; the old one stops working |
+| `POST` | `/v1/auth/logout` | Requires a user token. Clears the stored refresh hash |
+
+Access tokens are short-lived and carry subject, role, and expiry. Refresh tokens rotate on every
+use, and only their SHA-256 hash is stored, so logout and revocation are possible. One hash is stored
+per user, so a second login ends the first session.
+
+Login refuses an unknown email and a wrong password with the same `401` and the same message.
+Registering an email that already exists is a client fault and returns `400`.
+
 ## User endpoints
 
 Require a user token. All act on the caller's own identity — none accept a user id.

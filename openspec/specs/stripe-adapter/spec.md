@@ -159,6 +159,31 @@ an outage.
 - **WHEN** a failure carrying a Stripe request id is classified
 - **THEN** that request id is readable from the domain error
 
+### Requirement: An absent object is an answer, not a failure
+
+A retrieve operation SHALL return `null` when Stripe reports the object does not exist, and SHALL
+raise a classified failure for every other error. Both implementations SHALL behave identically here.
+
+An object that is not there yet is a normal state in this system, not a fault: webhook processing is
+required to *defer* rather than fail when its subject is missing, and the sync reconciler asks about
+objects it may not have created yet. If absence arrived as a permanent failure, the handler would
+dead-letter the event instead of retrying it once the object appears.
+
+#### Scenario: A retrieve of something that does not exist answers null
+
+- **WHEN** a customer, subscription, or invoice is retrieved by an id Stripe reports as missing
+- **THEN** the operation returns `null`
+- **AND** the fake returns `null` for the same call
+
+  These two must agree. While they did not, every test exercised the null path and production took
+  the throwing one — a divergence invisible to the whole suite.
+
+#### Scenario: A retrieve that fails for any other reason still raises
+
+- **WHEN** a retrieve fails with an outage, a rate limit, or an authentication error
+- **THEN** the adapter raises a classified domain error rather than returning `null`
+- **AND** its verdict is unchanged by the absence handling
+
 ### Requirement: Webhook events verify against a list of signing secrets
 
 The adapter SHALL construct a webhook event from the raw request body, the signature header, and the

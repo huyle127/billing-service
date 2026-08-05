@@ -212,10 +212,13 @@ covered the table has served its purpose and can retire in favour of the specs.
   revised — an inbound event's `api_version` is set Stripe-side, so a mismatch is **logged, not
   rejected**; rejecting would drop real traffic during a version change. Also the ticket under which
   the **directory layout and the no-literals rule became binding** in
-  [`module-boundaries.md`](../architecture/module-boundaries.md) and in `openspec/config.yaml`, after
-  reading how `nghiahoangDigiEx/AI-billing-service` divides its modules: per-module `dto/` and
+  [`module-boundaries.md`](../architecture/module-boundaries.md) and in `openspec/config.yaml`, divides its modules: per-module `dto/` and
   `constants/` and one file per handler adopted, its provider-abstraction module and its
-  repository-less services not.
+  repository-less services not. **Corrected 2026-08-05:** the two adapters disagreed about a missing
+  object — the fake returned `null`, the real one threw a permanent failure on Stripe's 404 — so
+  every test would have deferred as ticket 017 requires while production dead-lettered the event.
+  Fixed with `retrieveOrNull`. The audit that found it concluded **no rewrite**: the seam is wide
+  (16 operations, 8 mappers), not deep, and every operation is named by a ticket from 023 to 032.
 - [034 Determine the Stripe account's billing mode](tickets/034-determine-stripe-billing-mode.md)
   — **`flexible`**, with `proration_discounts: "included"`, read from four existing subscriptions
   created weeks apart, so it is the account default rather than a per-object override. Ticket 003
@@ -229,6 +232,18 @@ covered the table has served its purpose and can retire in favour of the specs.
   object's **`paid` boolean now reads `undefined`** — falsy, so `if (invoice.paid)` would silently
   never allocate. Use `status === 'paid'`. Confirmed directly that period fields live on the
   subscription *item*.
+- [020 Build the auth module](tickets/020-build-auth-module.md)
+  — shipped through OpenSpec change `build-auth-module`. Registration, login, rotating refresh, and
+  logout; plain guards against `JwtService` with **`HS256` pinned once in `JwtModule`**; Passport
+  removed. **Built twice** — the first plan was 24 files and 51 tasks, cut to **13 files and 30
+  tasks**  whose auth module is ~230
+  lines and has no repository layer. That produced three standing rules: **`repositories/` is
+  conditional**, an operation is built when a caller exists, and the injected `Clock` is for domain
+  time, not for JWT expiry. **The internal API key is deferred to ticket 023**, so this closes
+  **four** of Section 9's six clauses rather than all six. Found by test: **rotation reissued an
+  identical token**, because a JWT is a pure function of payload, issued-at second, and secret —
+  refresh tokens now carry a `jti`. `auth ──▶ billing` added to the graph, putting `auth` where
+  deleting it breaks nothing. 23 new tests, 73 total.
 
 ## Not yet specified
 
@@ -287,20 +302,19 @@ Ruled beyond this destination. These never graduate.
 Frontier (open, unblocked, unclaimed):
 
 - [002 Provision Stripe test account and CLI](tickets/002-provision-stripe-test-account.md) — task — only `stripe listen` forwarding left, checkable once 024 lands
-- [020 Build the auth module](tickets/020-build-auth-module.md) — task — unblocked by 018
+- [021 Build the credit ledger: consumption and reversal](tickets/021-build-credit-consumption.md) — task — unblocked by 020 — `/tdd`
 - [024 Build webhook ingestion and the queue worker](tickets/024-build-webhook-ingestion-and-worker.md) — task — unblocked by 019
+- [029 Build the plan and add-on catalog with admin CRUD](tickets/029-build-plan-catalog-admin.md) — task — unblocked by 020
 - [035 Decide whether imports use the `@/` path alias](tickets/035-decide-import-path-alias.md) — task — cheapest while only twelve files exist
 
 Blocked:
 
-- [021 Build the credit ledger: consumption and reversal](tickets/021-build-credit-consumption.md) — task — 020 — `/tdd`
 - [022 Build the credit ledger: allocation, adjustment, and wallet freeze](tickets/022-build-credit-allocation-and-freeze.md) — task — 021 — `/tdd`
 - [023 Build registration provisioning and the Stripe sync reconciler](tickets/023-build-registration-provisioning.md) — task — 020, 022
 - [025 Build the subscription lifecycle state machine](tickets/025-build-subscription-lifecycle.md) — task — 022, 023 — `/tdd`
 - [026 Build the subscription webhook handlers and the ordering guarantees](tickets/026-build-subscription-webhook-handlers.md) — task — 024, 025
 - [027 Build the invoice webhook handlers and the credit allocation triggers](tickets/027-build-invoice-handlers-and-allocation.md) — task — 022, 024, 025
 - [028 Build the annual allocation cron and the internal endpoints](tickets/028-build-annual-allocation-cron.md) — task — 027
-- [029 Build the plan and add-on catalog with admin CRUD](tickets/029-build-plan-catalog-admin.md) — task — 020
 - [030 Build the price change and subscriber migration reconciler](tickets/030-build-price-change-migration.md) — task — 029
 - [031 Build subscription self-service and payment methods](tickets/031-build-subscription-self-service.md) — task — 023, 025, 029, 034
 - [032 Build add-on credit purchase](tickets/032-build-addon-purchase.md) — task — 027, 029, 031
@@ -332,3 +346,4 @@ Closed:
 - [034 Determine the Stripe account's billing mode](tickets/034-determine-stripe-billing-mode.md) — task
 - [018 Build the common layer](tickets/018-build-common-layer.md) — task — OpenSpec change `build-common-layer`
 - [019 Build the Stripe adapter seam and its test fake](tickets/019-build-stripe-adapter.md) — task — OpenSpec change `build-stripe-adapter`, archived; capability spec [`stripe-adapter`](../../openspec/specs/stripe-adapter/spec.md)
+- [020 Build the auth module](tickets/020-build-auth-module.md) — task — OpenSpec change `build-auth-module`; four of six Section 9 clauses, the internal API key deferred to 023

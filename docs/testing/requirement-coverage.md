@@ -78,12 +78,16 @@ Status: `covered` · `partial` · `todo`
 
 | Clause | Test | Status |
 | --- | --- | --- |
-| Passwords hashed with bcrypt | | todo |
-| Refresh token hash stored; logout revokes | | todo |
-| User endpoints reject an absent or invalid token | | todo |
-| Admin endpoints reject a user token | | todo |
-| Internal key yields a service principal with no user identity | | todo |
-| Internal endpoints reject "act on behalf of" semantics | | todo |
+| Passwords hashed with bcrypt | `auth.service: stores a bcrypt hash and never the password` | covered |
+| Refresh token hash stored; logout revokes | `auth.service: stores the hash of the refresh token it hands out, not the token` · `auth.service: clears the stored hash on logout` | covered |
+| User endpoints reject an absent or invalid token | `auth-http: rejects every shape of unusable access token with 401` | covered |
+| Admin endpoints reject a user token | `auth-http: lets an admin token through and turns a user token away` | covered |
+| Internal key yields a service principal with no user identity | | todo — ticket 023 |
+| Internal endpoints reject "act on behalf of" semantics | | todo — ticket 023 |
+
+The last two are deferred deliberately. The internal API key has no endpoint to guard until ticket
+023 ships `POST /v1/internal/provisioning/run`; building the guard earlier would mean asserting it
+against a probe controller that exists only in a test.
 
 ## Section 10 — Non-functional
 

@@ -79,9 +79,7 @@ disagree about it.
 object" is a property the fake can actually fail. A fake that could not fail the tests that matter
 most would be worse than no fake.
 
-**The layout and the naming rule were made binding here**, after reading how
-`nghiahoangDigiEx/AI-billing-service` splits its modules and after checking what NestJS itself
-prescribes. Both now live in [`module-boundaries.md`](../../architecture/module-boundaries.md),
+**The layout and the naming rule were made binding here**, Both now live in [`module-boundaries.md`](../../architecture/module-boundaries.md),
 echoed into `openspec/config.yaml` so every future proposal reads them, with the handler rule also
 named in ticket 024 where it will first be built.
 
@@ -160,3 +158,31 @@ compile, and a test fails if any seam file rebuilds a key from a literal.
   not a same-request deduplicator; the idempotency key covers the hot path. Against the fake the
   search is instantaneous, so this failure mode is invisible in testing. Tickets 023 and 032 must not
   lean on it as a sole guard.
+
+### Correction, 2026-08-05 — the two adapters disagreed about a missing object
+
+Found while auditing this seam for over-engineering after ticket 020. `retrieveCustomer`,
+`retrieveSubscription`, and `retrieveInvoice` all declared `Promise<T | null>`. **The fake returned
+`null`; the real adapter threw**, because Stripe answers a missing id with a 404 and `call()` turned
+that into a `permanent` domain failure. The `| null` in the signature was true of one implementation
+and a lie about the other.
+
+This is the exact failure the fake exists to prevent, and it was aimed at the requirement that
+matters most downstream: ticket 017 requires webhook processing to **defer when its subject is
+missing**. Every test would have taken the `null` branch and deferred correctly while production took
+the throwing branch and dead-lettered the event — green suite, wrong behaviour, and no test in the
+repository could have seen it.
+
+Fixed with `retrieveOrNull` and an `isMissingResource` predicate: a Stripe 404 returns `null`, every
+other error is still classified and raised. Two tests added — both implementations answer `null` for
+an absent object, and a 500 still raises as retryable so absence handling cannot swallow an outage.
+The live capability spec gained the requirement *"An absent object is an answer, not a failure"*.
+
+**The audit's other conclusion: no rewrite.** The seam is 1793 lines because it is *wide* — sixteen
+operations and eight mappers — not because it is *deep*; there is no indirection to remove. All
+sixteen operations are named by tickets 023 through 032, so they were built ahead of schedule rather
+than for imagined needs, and deleting them would mean retyping them. Four genuine cuts are recorded
+and not yet made: `STRIPE_OPERATIONS` duplicates what `keyof StripeService` gives free, the four
+one-or-two-entry status constants duplicate unions the types already declare,
+`fake-stripe.adapter.spec.ts` tests the test harness, and two tests in `stripe-seam.spec.ts` enforce
+conventions by scanning source text — roughly 250 lines, no logic touched.

@@ -11,7 +11,7 @@ import {
   STRIPE_OPERATIONS,
   StripeOperation,
 } from '../stripe.constants';
-import { classifyStripeError } from '../stripe.error';
+import { classifyStripeError, isMissingResource } from '../stripe.error';
 import { StripeService } from '../interfaces/stripe-adapter.interface';
 import {
   AttachPaymentMethodParams,
@@ -69,11 +69,13 @@ export class StripeSdkAdapter extends StripeService {
   }
 
   async retrieveCustomer(customerId: string): Promise<StripeCustomer | null> {
-    const customer = await this.call(STRIPE_OPERATIONS.retrieveCustomer, () =>
+    const customer = await this.retrieveOrNull(STRIPE_OPERATIONS.retrieveCustomer, () =>
       this.client.customers.retrieve(customerId),
     );
 
-    return customer.deleted ? null : this.toCustomer(customer);
+    if (!customer || customer.deleted) return null;
+
+    return this.toCustomer(customer);
   }
 
   async findCustomerByUserId(userId: string): Promise<StripeCustomer | null> {
@@ -106,11 +108,11 @@ export class StripeSdkAdapter extends StripeService {
   }
 
   async retrieveSubscription(subscriptionId: string): Promise<StripeSubscription | null> {
-    const subscription = await this.call(STRIPE_OPERATIONS.retrieveSubscription, () =>
+    const subscription = await this.retrieveOrNull(STRIPE_OPERATIONS.retrieveSubscription, () =>
       this.client.subscriptions.retrieve(subscriptionId),
     );
 
-    return this.toSubscription(subscription);
+    return subscription ? this.toSubscription(subscription) : null;
   }
 
   async findSubscriptionByLocalId(localId: string): Promise<StripeSubscription | null> {
@@ -223,11 +225,11 @@ export class StripeSdkAdapter extends StripeService {
   }
 
   async retrieveInvoice(invoiceId: string): Promise<StripeInvoice | null> {
-    const invoice = await this.call(STRIPE_OPERATIONS.retrieveInvoice, () =>
+    const invoice = await this.retrieveOrNull(STRIPE_OPERATIONS.retrieveInvoice, () =>
       this.client.invoices.retrieve(invoiceId),
     );
 
-    return this.toInvoice(invoice);
+    return invoice ? this.toInvoice(invoice) : null;
   }
 
   async createOneTimePayment(params: CreateOneTimePaymentParams): Promise<StripePayment> {
@@ -292,6 +294,18 @@ export class StripeSdkAdapter extends StripeService {
     try {
       return await run();
     } catch (error) {
+      throw classifyStripeError(error, operation);
+    }
+  }
+
+  private async retrieveOrNull<T>(
+    operation: StripeOperation,
+    run: () => Promise<T>,
+  ): Promise<T | null> {
+    try {
+      return await run();
+    } catch (error) {
+      if (isMissingResource(error)) return null;
       throw classifyStripeError(error, operation);
     }
   }

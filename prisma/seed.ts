@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { BillingCycle, PrismaClient } from '@prisma/client';
+import { seedAdmin } from './seed-admin';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DIRECT_URL }),
@@ -70,6 +71,8 @@ async function main(): Promise<void> {
   const planCount = await prisma.plan.count();
   const packageCount = await prisma.addonPackage.count();
   console.log(`seeded ${planCount} plans, ${packageCount} addon packages`);
+
+  await seedAdmin(prisma);
 }
 
 main()

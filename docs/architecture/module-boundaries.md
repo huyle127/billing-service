@@ -37,7 +37,7 @@ to put in it:
 <module>/
   controllers/       HTTP surface. One controller per route group.
   services/          business logic. The only layer that opens transactions.
-  repositories/      Prisma access. One per aggregate.
+  repositories/      Prisma access, one per aggregate — only where it earns its place, see below.
   dto/               request and response shapes. The only place class-validator appears.
   guards/            route guards specific to this module.
   decorators/        parameter and metadata decorators specific to this module.
@@ -46,9 +46,21 @@ to put in it:
   <module>.module.ts
 ```
 
-`controllers/` and `services/` and `repositories/` are not optional layers to be collapsed when a
-module is small. A service that talks to Prisma directly saves one file today and costs a rewrite
-when the second caller arrives — and it puts query construction where transaction boundaries live.
+`controllers/` and `services/` are not optional layers to be collapsed when a module is small. A
+controller holding business logic is the failure this prevents, and it does not become acceptable
+because there is only one route.
+
+**`repositories/` is conditional.** A module gets one when it has enough query surface for the
+separation to buy something: several aggregates, queries built from varying criteria, or raw SQL
+sitting next to Prisma calls. `billing/` and `credit/` qualify. A module whose repository methods
+would each forward a single call to Prisma does not, and `auth/` and `user/` are that case — Prisma
+Client is already a generated, type-safe data-access layer, and a class that adds nothing but a
+second name for `findUnique` is a layer readers must traverse for no information.
+
+What the seam actually rests on is **table ownership**, not the presence of a class: `AuthCredential`
+is written only inside `src/auth/` whether or not a repository stands in front of it, and
+`auth-seam.spec.ts` is what enforces it. Introduce the layer when the second non-trivial query
+arrives, not in anticipation of it.
 
 **An adapter directory groups by role too**, with the roles an adapter actually has. It has no
 `controllers/` because it serves no routes and no `repositories/` because it owns no table, but the
@@ -134,16 +146,23 @@ input to one assertion, not a contract between files.
 
 ```
 auth ──▶ user
-             ▲
-billing ─────┘
-   │
-   ▼
-credit
+  │        ▲
+  └──▶ billing
+          │
+          ▼
+        credit
 ```
 
 `credit` is a leaf. It never reads `billing`, `user`, or `auth`. This is the rule that keeps the
 graph acyclic: credit allocation needs to know an *amount*, and the caller passes it. If credit ever
 needs to look up a subscription to decide how much to allocate, the cycle is back — so it does not.
+
+**`auth` sits at the top, and the `auth ──▶ billing` edge is what puts it there.** Registration opens
+one transaction and creates `User` and `AuthCredential` in it; ticket 023 extends that same
+transaction with `BillingCustomer`, the Free `Subscription`, and the `CreditWallet`. Pointing the
+edge the other way — `billing` owning registration and calling `auth` — would make the largest module
+depend on the one built to be deleted. With the edge this way round nothing imports `auth`, so when
+an upstream Authentication Service arrives it is removed and provisioning is reached directly.
 
 No module may import from a module that does not appear downstream of it here.
 

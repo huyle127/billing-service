@@ -96,6 +96,37 @@ describe('the Stripe seam', () => {
     expect(names.filter((name) => /^list/.test(name))).toEqual([]);
   });
 
+  it('answers a missing object with null from both implementations', async () => {
+    const missing = new Stripe.errors.StripeInvalidRequestError({
+      message: 'No such subscription: sub_missing',
+      statusCode: 404,
+      code: 'resource_missing',
+    });
+    const adapter = withStubbedRetrieves(() => Promise.reject(missing));
+    const fake = new FakeStripeAdapter(clock);
+
+    expect(await fake.retrieveSubscription('sub_missing')).toBeNull();
+    expect(await fake.retrieveCustomer('cus_missing')).toBeNull();
+    expect(await fake.retrieveInvoice('in_missing')).toBeNull();
+
+    expect(await adapter.retrieveSubscription('sub_missing')).toBeNull();
+    expect(await adapter.retrieveCustomer('cus_missing')).toBeNull();
+    expect(await adapter.retrieveInvoice('in_missing')).toBeNull();
+  });
+
+  it('still raises when a retrieve fails for a reason other than absence', async () => {
+    const outage = new Stripe.errors.StripeAPIError({
+      message: 'Stripe is down',
+      statusCode: 500,
+    });
+    const adapter = withStubbedRetrieves(() => Promise.reject(outage));
+
+    const thrown = await adapter.retrieveSubscription('sub_1').catch((error: unknown) => error);
+
+    expect(thrown).toBeInstanceOf(StripeAdapterError);
+    expect((thrown as StripeAdapterError).retryable).toBe(true);
+  });
+
   it('keeps the SDK inside the adapter directory', () => {
     const offenders = sourceFiles(join(process.cwd(), 'src'))
       .filter((file) => !relative(process.cwd(), file).includes(join('billing', 'stripe')))
@@ -294,6 +325,21 @@ function catchError(run: () => unknown): StripeAdapterError | null {
   } catch (error) {
     return error as StripeAdapterError;
   }
+}
+
+function withStubbedRetrieves(run: () => Promise<never>, clock?: Clock): StripeSdkAdapter {
+  const config = {
+    stripeSecretKey: 'sk_test_x',
+    stripeWebhookSecrets: [],
+  } as unknown as AppConfigService;
+  const adapter = new StripeSdkAdapter(config, clock ?? new FixedClock(new Date(0)));
+  const client = (adapter as unknown as { client: Stripe }).client;
+
+  client.customers.retrieve = run as unknown as typeof client.customers.retrieve;
+  client.subscriptions.retrieve = run as unknown as typeof client.subscriptions.retrieve;
+  client.invoices.retrieve = run as unknown as typeof client.invoices.retrieve;
+
+  return adapter;
 }
 
 function sourceFiles(directory: string): string[] {
