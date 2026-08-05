@@ -22,6 +22,13 @@ describe('the clock lint rule', () => {
     expect(result.errorCount).toBe(1);
   });
 
+  it('allows a Date built from a value it was given, which reads no clock', async () => {
+    const source = 'export const at = new Date(1774000000000);\n';
+    const result = await lint('src/billing/planted.ts', source);
+
+    expect(result.errorCount).toBe(0);
+  });
+
   it('allows the clock implementation itself', async () => {
     const result = await lint('src/common/clock/planted.ts', 'export const at = new Date();\n');
 

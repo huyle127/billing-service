@@ -24,6 +24,12 @@ handlers are tickets 026, 027, and 031.
   `@@index([status, nextAttemptAt])`, dispatch by `type` to a handler registry, then mark
   `COMPLETED`, schedule a retry, or `DEAD_LETTERED`. Same mechanism the sync reconciler uses, so
   several workers can run concurrently without colliding.
+- **The registry dispatches to one file per event type in `billing/webhook/handlers/`**, not to arms
+  of a `switch`. The binding layout is in
+  [`module-boundaries.md`](../../architecture/module-boundaries.md); the reason it is named here is
+  that tickets 026, 027, and 031 each add handlers to whatever shape this ticket leaves behind, and a
+  switch is only ever grown, never split. **Event type strings are declared once** and referenced by
+  both the registry and the handler that claims them.
 - **Three outcomes, not two: completed, failed, and deferred.** A deferral — the event's subject does
   not exist locally yet — **must be distinguishable from a genuine failure and must not consume the
   retry budget the same way.** Ticket 017 required this because deferral is an ordinary race, not an

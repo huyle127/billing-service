@@ -16,6 +16,120 @@ src/
   credit/            wallet, two ledgers, credit transactions
 ```
 
+## Directory layout
+
+This section is binding. A layout not described here needs this document changed first, because the
+cost of an inconsistent tree is paid by every later reader, not by whoever introduced it.
+
+**This is not the NestJS convention, and nobody should cite it as one.** `nest g resource billing`
+produces a *flat* module — `billing.controller.ts`, `billing.service.ts`, `billing.module.ts` at the
+module root, with only `dto/` and `entities/` as subdirectories. The framework's own documentation
+shows the same shape. Grouping by role is a choice this repository makes on top of the framework,
+and the reason is size: by the time tickets 023–033 have landed, `billing/` holds roughly eight
+controllers, eight services, eight repositories, fifteen DTOs and six handlers. Forty-five files at
+one level is not navigable, and `nest g` output will need moving after generation. That is the trade
+being accepted, deliberately.
+
+**A feature module has exactly these directories**, and creates each one only when it has something
+to put in it:
+
+```
+<module>/
+  controllers/       HTTP surface. One controller per route group.
+  services/          business logic. The only layer that opens transactions.
+  repositories/      Prisma access. One per aggregate.
+  dto/               request and response shapes. The only place class-validator appears.
+  guards/            route guards specific to this module.
+  decorators/        parameter and metadata decorators specific to this module.
+  listeners/         event-bus subscribers. Audit, notification, analytics only.
+  <module>.constants.ts
+  <module>.module.ts
+```
+
+`controllers/` and `services/` and `repositories/` are not optional layers to be collapsed when a
+module is small. A service that talks to Prisma directly saves one file today and costs a rewrite
+when the second caller arrives — and it puts query construction where transaction boundaries live.
+
+**An adapter directory groups by role too**, with the roles an adapter actually has. It has no
+`controllers/` because it serves no routes and no `repositories/` because it owns no table, but the
+contract, the implementations of that contract, and the types crossing it are three different things
+and are separated as such:
+
+```
+billing/stripe/
+  interfaces/
+    stripe-adapter.interface.ts   the abstract class — contract and injection token in one
+  adapters/
+    stripe-sdk.adapter.ts         the implementation that talks to Stripe
+    fake-stripe.adapter.ts        the implementation tests run against
+  types/
+    stripe.types.ts               domain types crossing the seam
+  stripe.constants.ts             every provider-facing literal
+  stripe.error.ts                 failure classification
+  webhook-signature.ts            verification shared by both implementations
+  stripe.module.ts
+```
+
+Three of these directories hold one or two files, and that is the cost of the rule rather than an
+argument against it. What buys it back is that `interfaces/` and `adapters/` say out loud what a
+`.service.ts` suffix said wrongly: the abstract class is not a service, and the two implementations
+are not two services. A reader opening `adapters/` learns immediately that there is more than one
+implementation, which is the single most important fact about this directory.
+
+The three loose files stay loose because each is one thing with no sibling — a constants module, an
+error classifier, a verifier shared by both adapters. A directory per file would be filing for its
+own sake.
+
+**A handler family gets its own directory once there is more than one member** —
+`billing/webhook/handlers/`, one file per event type. A single `switch` over event types in one
+service is what this replaces; it grows without bound and every arm shares a scope with every other.
+
+**File naming is `<thing>.<role>.ts` in kebab-case**, and one exported class per file. The role
+suffix must name the role the file actually plays: `subscription.controller.ts`,
+`plan.repository.ts`, `stripe-sdk.adapter.ts`, `stripe-adapter.interface.ts`. `.service.ts` means a
+service — not a contract, and not an infrastructure adapter. A suffix that lies is worse than none,
+because it is believed.
+
+**`.port.ts` is not used**, deliberately. Ticket 004 rejected hexagonal ports for a single provider,
+and importing the vocabulary would reopen a closed decision by the back door.
+
+**Tests sit next to what they test**, as `<file>.spec.ts`. A test that spans modules or needs the
+HTTP layer lives in `test/` instead. Co-location is what keeps a unit test from being forgotten
+when its subject moves.
+
+**Injection tokens are abstract classes, never strings.** `{ provide: StripeService, useClass:
+FakeStripeAdapter }` is checked by the compiler; `{ provide: 'STRIPE_SERVICE', ... }` is checked by
+nobody, and it forces `@Inject()` at every call site.
+
+## Names that must not be literals
+
+A string that two files must agree on is a contract, and a contract that lives in two places will
+eventually live in two versions. The failure is always silent: a search that finds nothing, an event
+nobody handles, a config key that reads `undefined`.
+
+| Kind of name | Where it lives | What stops a literal |
+| --- | --- | --- |
+| Environment keys | `common/config` — read through `AppConfigService` only | nothing outside `common/config` may touch `process.env` or `ConfigService` |
+| Error codes | the `ErrorCode` union in `common/errors` | the union type |
+| Domain enums — status, ledger, cycle, transaction type | Prisma-generated enums | the generated types |
+| Stripe metadata keys, idempotency keys, API version, provider statuses | `billing/stripe/stripe.constants.ts` | a test asserting the seam builds none of them from a literal |
+| Webhook event type strings | one constants module beside the handler registry | *to be added by ticket 024* |
+| Adapter operation names | `STRIPE_OPERATIONS` in the same file | `StripeOperation` is a union derived from it |
+| Event-bus event names | one constants file under the module that emits them | *to be added by the change that introduces the bus* |
+
+Two rules follow from the table rather than being separate:
+
+- **The key a writer writes and the key a reader queries must be the same expression**, not two
+  literals that happen to match. `metadata.userId` written on create and `metadata['userId']` in a
+  search query are the paired case that motivated this: a typo in either makes the adopt path find
+  nothing, create a duplicate object, and report success.
+- **Two implementations of one interface must derive shared values from one place.** The fake and
+  the real adapter both compute `customer:{userId}`; if they computed it from separate literals, the
+  test proving retries are safe would prove it only about the fake.
+
+Literals used as test data — an email, a card brand, a fixed instant — are exempt. They are the
+input to one assertion, not a contract between files.
+
 ## Dependency direction
 
 ```

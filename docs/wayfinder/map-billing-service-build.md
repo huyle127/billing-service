@@ -200,6 +200,22 @@ covered the table has served its purpose and can retire in favour of the specs.
   with the code: raw body stays global (Nest's own option; scoping it would mean hand-wiring the body
   parser on the one route whose failure is silent), and the error-code union ships five codes, because
   a filter that catches everything must map 401 and 403 rather than mislabel them `INTERNAL_ERROR`.
+- [019 Build the Stripe adapter seam and its test fake](tickets/019-build-stripe-adapter.md)
+  — shipped through OpenSpec change `build-stripe-adapter`. Sixteen operations behind an **abstract
+  class used as its own injection token**, so the compiler proves the fake satisfies the real shape;
+  domain types only, no listing operation, and a test that fails if anything outside
+  `src/billing/stripe/` imports `stripe`. Idempotency keys are derived **inside** the adapter so the
+  fast path and the reconciler cannot disagree. 27 new tests, none touching the network. Three
+  discoveries: `constructEvent`'s `receivedAt` is **milliseconds**, so the tolerance window silently
+  never fired; the ticket-018 lint rule banned `new Date(value)` too and was narrowed to zero-arg;
+  and `Invoice.subscription` is now `invoice.parent.subscription_details.subscription`. One decision
+  revised — an inbound event's `api_version` is set Stripe-side, so a mismatch is **logged, not
+  rejected**; rejecting would drop real traffic during a version change. Also the ticket under which
+  the **directory layout and the no-literals rule became binding** in
+  [`module-boundaries.md`](../architecture/module-boundaries.md) and in `openspec/config.yaml`, after
+  reading how `nghiahoangDigiEx/AI-billing-service` divides its modules: per-module `dto/` and
+  `constants/` and one file per handler adopted, its provider-abstraction module and its
+  repository-less services not.
 - [034 Determine the Stripe account's billing mode](tickets/034-determine-stripe-billing-mode.md)
   — **`flexible`**, with `proration_discounts: "included"`, read from four existing subscriptions
   created weeks apart, so it is the account default rather than a per-object override. Ticket 003
@@ -271,20 +287,20 @@ Ruled beyond this destination. These never graduate.
 Frontier (open, unblocked, unclaimed):
 
 - [002 Provision Stripe test account and CLI](tickets/002-provision-stripe-test-account.md) — task — only `stripe listen` forwarding left, checkable once 024 lands
-- [019 Build the Stripe adapter seam and its test fake](tickets/019-build-stripe-adapter.md) — task — unblocked by 018
 - [020 Build the auth module](tickets/020-build-auth-module.md) — task — unblocked by 018
+- [024 Build webhook ingestion and the queue worker](tickets/024-build-webhook-ingestion-and-worker.md) — task — unblocked by 019
+- [035 Decide whether imports use the `@/` path alias](tickets/035-decide-import-path-alias.md) — task — cheapest while only twelve files exist
 
 Blocked:
 
 - [021 Build the credit ledger: consumption and reversal](tickets/021-build-credit-consumption.md) — task — 020 — `/tdd`
 - [022 Build the credit ledger: allocation, adjustment, and wallet freeze](tickets/022-build-credit-allocation-and-freeze.md) — task — 021 — `/tdd`
-- [023 Build registration provisioning and the Stripe sync reconciler](tickets/023-build-registration-provisioning.md) — task — 019, 020, 022
-- [024 Build webhook ingestion and the queue worker](tickets/024-build-webhook-ingestion-and-worker.md) — task — 018, 019
+- [023 Build registration provisioning and the Stripe sync reconciler](tickets/023-build-registration-provisioning.md) — task — 020, 022
 - [025 Build the subscription lifecycle state machine](tickets/025-build-subscription-lifecycle.md) — task — 022, 023 — `/tdd`
 - [026 Build the subscription webhook handlers and the ordering guarantees](tickets/026-build-subscription-webhook-handlers.md) — task — 024, 025
 - [027 Build the invoice webhook handlers and the credit allocation triggers](tickets/027-build-invoice-handlers-and-allocation.md) — task — 022, 024, 025
 - [028 Build the annual allocation cron and the internal endpoints](tickets/028-build-annual-allocation-cron.md) — task — 027
-- [029 Build the plan and add-on catalog with admin CRUD](tickets/029-build-plan-catalog-admin.md) — task — 019, 020
+- [029 Build the plan and add-on catalog with admin CRUD](tickets/029-build-plan-catalog-admin.md) — task — 020
 - [030 Build the price change and subscriber migration reconciler](tickets/030-build-price-change-migration.md) — task — 029
 - [031 Build subscription self-service and payment methods](tickets/031-build-subscription-self-service.md) — task — 023, 025, 029, 034
 - [032 Build add-on credit purchase](tickets/032-build-addon-purchase.md) — task — 027, 029, 031
@@ -315,3 +331,4 @@ Closed:
 - [017 Design out-of-order webhook handling](tickets/017-design-out-of-order-webhook-handling.md) — grilling
 - [034 Determine the Stripe account's billing mode](tickets/034-determine-stripe-billing-mode.md) — task
 - [018 Build the common layer](tickets/018-build-common-layer.md) — task — OpenSpec change `build-common-layer`
+- [019 Build the Stripe adapter seam and its test fake](tickets/019-build-stripe-adapter.md) — task — OpenSpec change `build-stripe-adapter`, archived; capability spec [`stripe-adapter`](../../openspec/specs/stripe-adapter/spec.md)

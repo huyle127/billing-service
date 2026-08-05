@@ -27,6 +27,24 @@ context: |
   Each is shaped controllers/ services/ repositories/. credit is a leaf and never reads
   billing, user, or auth. No use-case layer, no hexagonal ports.
 
+  The directory layout in docs/architecture/module-boundaries.md is binding — read that
+  section before creating a file. It is NOT the NestJS convention: `nest g resource` emits a
+  flat module with only dto/ and entities/, and this repository groups by role on top of that
+  because billing/ reaches roughly forty-five files. Do not cite Nest as the reason for it,
+  and expect to move generated files after running the CLI.
+
+  In short: a module owns controllers/ services/ repositories/ dto/ and, when needed,
+  guards/ decorators/ listeners/, plus <module>.constants.ts and <module>.module.ts. Layers
+  are not collapsed because a module is small; a service never talks to Prisma directly. An
+  adapter directory groups by the roles an adapter has — billing/stripe/ is
+  interfaces/ adapters/ types/ plus loose single-purpose files. A handler family gets its own
+  directory once it has a second member — one file per event type, never a growing switch.
+  Files are named <thing>.<role>.ts in kebab-case, one exported class each, and the suffix
+  must name the role the file actually plays: .adapter.ts and .interface.ts are not
+  .service.ts, and .port.ts is not used because ticket 004 rejected hexagonal ports. Tests sit
+  beside their subject as <file>.spec.ts; cross-module and HTTP tests live in test/. Injection
+  tokens are abstract classes, never strings.
+
   RULES THAT CAUSE REAL DAMAGE IF VIOLATED:
 
   - Always `prisma migrate`, never `prisma db push`. Hand-written CHECK constraints and
@@ -64,6 +82,14 @@ context: |
     notification, and analytics only.
   - Time comes from the injectable clock in common/clock. Domain code never calls new Date().
   - Money and credits are integers throughout.
+  - A string two files must agree on is declared once and referenced, never repeated as a
+    literal — see "Names that must not be literals" in module-boundaries.md. Environment keys
+    go through AppConfigService; error codes through the ErrorCode union; status, ledger,
+    cycle and transaction type through the Prisma-generated enums; Stripe metadata keys,
+    idempotency keys, the API version and provider statuses through
+    billing/stripe/stripe.constants.ts; event-bus names through one constants file under the
+    module that emits them. The failure is always silent: a search that finds nothing, an
+    event nobody handles, a config key that reads undefined. Test data literals are exempt.
 
   Style, from AGENTS.md: code in English, explanations in Vietnamese. No comments unless
   explicitly requested. Prefer early return, prefer ternary over simple if/else, avoid nested

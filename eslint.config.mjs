@@ -11,7 +11,7 @@ export default tseslint.config(
     rules: {
       'no-restricted-syntax': [
         'error',
-        { selector: "NewExpression[callee.name='Date']", message: clockMessage },
+        { selector: "NewExpression[callee.name='Date'][arguments.length=0]", message: clockMessage },
         {
           selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
           message: clockMessage,
