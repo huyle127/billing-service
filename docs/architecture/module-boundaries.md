@@ -42,7 +42,7 @@ module's service, not through another module's repository.
 | --- | --- |
 | `auth` | `AuthCredential` |
 | `user` | `User` |
-| `billing` | `Subscription`, `SubscriptionEvent`, `PaymentTransaction`, `PaymentMethod`, `Plan`, `AddonPackage`, `StripeCustomer`, `WebhookEvent` |
+| `billing` | `Subscription`, `SubscriptionEvent`, `PaymentTransaction`, `PaymentMethod`, `Plan`, `AddonPackage`, `BillingCustomer`, `WebhookEvent` |
 | `credit` | `CreditWallet`, `CreditTransaction` |
 
 ## Cross-module communication

@@ -98,6 +98,20 @@ resources would already be spent.
 the transaction under a unique constraint, so the guarantee survives concurrent retries rather than
 depending on application logic.
 
+**What a replay returns.** The constraint decides whether a second charge happens; this decides what
+the caller sees, and without it the constraint violation would surface as a `5xx`.
+
+| Second call | Response |
+| --- | --- |
+| Same key, same amount | `200` with the **original** result — the first call's `transactionId` and the balances as they were then |
+| Same key, different amount | `400` with `IDEMPOTENCY_KEY_REUSED` |
+
+A retry after a timeout must be indistinguishable from the success it is replaying, which is why the
+first row is a `200` and not a conflict. The second row fails loudly on purpose: one key now means
+two different operations, which is a caller bug, and returning the first result silently would
+undercharge with nothing to indicate it. Both behaviours match Stripe's and Square's, so integrating
+applications already expect them.
+
 ```
 POST /v1/credits/reverse
   { "idempotencyKey": "job-8f21c4" }

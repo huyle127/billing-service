@@ -1,0 +1,93 @@
+schema: spec-driven
+
+context: |
+  Billing Service — subscription billing, credit ledgers, and Stripe synchronisation.
+
+  Stack: TypeScript 6 on Node, NestJS 11, Prisma 7.9.1 with @prisma/adapter-pg,
+  Neon (serverless PostgreSQL), Vitest with unplugin-swc. Neon only — no Docker, no Redis.
+  The async pipeline is a Postgres-backed queue over the WebhookEvent table using
+  FOR UPDATE SKIP LOCKED.
+
+  Source documents, in order of authority:
+    docs/requirements/billing-service-requirements.md  — the requirements
+    docs/architecture/architecture.md                  — layering, transactions, webhook pipeline
+    docs/architecture/module-boundaries.md             — modules, table ownership, seams
+    docs/architecture/stripe-sync.md                   — failure recovery and convergence
+    docs/architecture/api-surface.md                   — routes and error model
+    docs/testing/strategy.md                           — how things are tested
+    docs/testing/requirement-coverage.md               — the completion criterion
+    AGENTS.md                                          — code style, binding
+
+  Planning lives in docs/wayfinder/map-billing-service-build.md. Each OpenSpec change
+  corresponds to one wayfinder build ticket in docs/wayfinder/tickets/; the ticket holds the
+  reasoning and the blocking edges, the change holds the spec delta and the tasks. Do not
+  restate one inside the other.
+
+  Modules: auth, user, billing (with billing/stripe and billing/webhook), credit.
+  Each is shaped controllers/ services/ repositories/. credit is a leaf and never reads
+  billing, user, or auth. No use-case layer, no hexagonal ports.
+
+  RULES THAT CAUSE REAL DAMAGE IF VIOLATED:
+
+  - Always `prisma migrate`, never `prisma db push`. Hand-written CHECK constraints and
+    partial indexes live in prisma/sql/constraints.sql and have nowhere to go without a
+    migration file. For a money ledger the migration history is also the audit trail.
+  - `prisma migrate dev` fails in a non-interactive shell whenever it emits a warning. Use
+    `prisma migrate diff --from-config-datasource --to-schema` then `prisma migrate deploy`.
+  - Database identifiers match Prisma model names exactly — there are no @@map or @map
+    directives. Every identifier in hand-written SQL must be double-quoted, because Postgres
+    folds unquoted identifiers to lower case and an unquoted CreditWallet silently resolves to
+    a nonexistent creditwallet. This has already caused one failure.
+  - TypeScript is pinned to 6. TS 7.0 ships only the tsc executable and does not expose the
+    programmatic compiler API the Nest CLI needs.
+  - Detect payment with `invoice.status === 'paid'`. The Invoice `paid` boolean was removed and
+    now reads undefined — falsy — so `if (invoice.paid)` would compile, pass review, and
+    silently never allocate credits.
+  - prisma/schema.prisma and prisma.config.ts already exist. No scaffold command may overwrite
+    them. Prisma 7 removed the url/directUrl datasource properties; connection config lives in
+    prisma.config.ts.
+  - Pin the Stripe apiVersion explicitly to 2026-07-29.dahlia rather than inheriting the
+    account default. Version 2025-03-31.basil moved current_period_end off the Subscription
+    object onto subscription items and restructured Invoice.
+
+  Architectural invariants:
+
+  - Business logic stays out of controllers. A controller that inspects a field to decide
+    behaviour has taken on business logic and belongs in a service.
+  - Stripe is an infrastructure adapter, confined to billing/stripe/. It is the only place
+    Stripe SDK types are visible.
+  - The service owning a flow opens the transaction; repositories and cross-module services
+    accept the transaction client as a parameter. Controllers and repositories never open
+    transactions.
+  - No network calls inside a transaction. The Stripe re-fetch happens before it opens.
+  - No invariant is ever maintained by an event-bus listener. The bus carries audit,
+    notification, and analytics only.
+  - Time comes from the injectable clock in common/clock. Domain code never calls new Date().
+  - Money and credits are integers throughout.
+
+  Style, from AGENTS.md: code in English, explanations in Vietnamese. No comments unless
+  explicitly requested. Prefer early return, prefer ternary over simple if/else, avoid nested
+  if/else, keep functions small. Reuse existing code before creating new abstractions. Do not
+  refactor unrelated code. Single quotes, Prettier defaults.
+
+rules:
+  proposal:
+    - State which wayfinder ticket this change implements, by name and number.
+    - Name the requirement clauses from docs/testing/requirement-coverage.md that this change
+      moves off `todo`, quoting them verbatim so they can be matched mechanically.
+  design:
+    - Do not re-litigate decisions already closed on the wayfinder map. Link the ticket that
+      closed them and move on.
+    - Call out explicitly any schema change needed, and state that it ships as a migration
+      generated with `migrate diff` and applied with `migrate deploy`.
+  tasks:
+    - Order tasks so tests come first for credit ledger and subscription lifecycle rules, and
+      after implementation for controllers, Prisma wiring, and configuration.
+    - The last task of every change updates docs/testing/requirement-coverage.md, moving each
+      claimed clause from `todo` to `covered` with the name of the test that asserts it.
+  specs:
+    - Write scenarios as behaviour observable from outside the module, so a named test can
+      assert them directly.
+    - Where a rule is enforced by a database constraint rather than application logic, say so
+      in the scenario — those are asserted by attempting the violation, not by trusting the
+      code path.

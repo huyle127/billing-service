@@ -99,9 +99,17 @@ searches Stripe by metadata; if the object already exists, it adopts it instead 
 Metadata is also what makes manual recovery possible. Without it, an orphaned Stripe object cannot
 be traced back to a user except by guesswork.
 
-**Layer 3 — the database constraint.** `stripeCustomerId` and the Stripe subscription reference are
-unique where present. Two concurrent provisioners racing the same row cannot both persist a result;
-the loser fails its write and retries, finding the work already done.
+**Layer 3 — the database constraint.** `stripeCustomerId` is unique where present, so two concurrent
+provisioners racing the same customer cannot both persist a result; the loser fails its write and
+retries, finding the work already done.
+
+**This layer does not extend to the subscription side, deliberately.** There is no unique constraint
+on `Subscription.stripeSubscriptionId`, only an index — `prisma/sql/constraints.sql` records the
+reason: expired rows are retained as history, and one Stripe subscription id can legitimately appear
+on more than one row across a plan change. What protects the subscription path is Layer 1 plus the
+shape of the write: both provisioners call Stripe with the same idempotency key, so both receive the
+same object and write the same value, and a lost update is therefore not a divergence. Do not go
+looking for a constraint here; it is absent on purpose.
 
 The ordering is deliberate: **create in Stripe, then persist locally.** Network calls are barred
 from transactions, so there is always a window. Layers 1 and 2 exist precisely to make crossing that
@@ -138,7 +146,8 @@ FOR UPDATE SKIP LOCKED;
 `FOR UPDATE SKIP LOCKED` lets several workers run concurrently without processing the same row —
 the same mechanism the webhook queue uses.
 
-The equivalent index exists on `billing_customers`.
+The equivalent index, `"BillingCustomer_pending_sync"`, exists on `"BillingCustomer"` — quoted, and
+spelled exactly as the Prisma model, per the identifier convention in §5.
 
 ## 5. Schema
 

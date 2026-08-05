@@ -70,6 +70,26 @@ restructured Invoice, and silent version drift would break the credit cron. Rese
 
 **Skills to consult.** `/tdd`, `/codebase-design`, `/domain-modeling`, `/setup-pre-commit`.
 
+**OpenSpec runs alongside this map** as of 2026-08-05 (`openspec/`, schema `spec-driven`). Two
+systems, one route — the split is fixed so they cannot drift:
+
+| | Authoritative for |
+| --- | --- |
+| This map and its tickets | The route. Why a decision went the way it did, what is blocked on what, what is still fog. |
+| `openspec/changes/<name>/` | One wayfinder build ticket's spec delta, design note, and task list. |
+| `openspec/specs/<capability>/` | What the system **actually does** — grows only when a change is archived after being built. |
+| `docs/testing/requirement-coverage.md` | Completion: which requirement clause is asserted by which named test. |
+
+**One build ticket, one change, created when the ticket is claimed** — not up front. Sixteen active
+changes would be sixteen plans nobody is working, which is the drift this split exists to prevent.
+Change names are the ticket titles in kebab-case; `openspec/config.yaml` carries the project context
+and the damage-causing rules, so every generated artifact inherits them.
+
+The unavoidable overlap is `requirement-coverage.md` against the OpenSpec delta specs — both describe
+required behaviour. The coverage table stays authoritative for *am I done*, the specs for *what does
+this do*, and every change's final task writes the clause back to the table. Once all 54 clauses are
+covered the table has served its purpose and can retire in favour of the specs.
+
 ## Decisions so far
 
 <!-- one line per closed ticket -->
@@ -171,6 +191,21 @@ restructured Invoice, and silent version drift would break the credit cron. Rese
   the development URL. **Transaction-rollback-per-test rejected** — consumption opens its own
   transaction, so nesting breaks rollback, and concurrent tests need two connections anyway.
   Harness proven: five tests passing.
+- [018 Build the common layer](tickets/018-build-common-layer.md)
+  — the first build ticket, shipped through OpenSpec change `build-common-layer`; behaviour now lives
+  in [`openspec/specs/platform/spec.md`](../../openspec/specs/platform/spec.md). Clock, five
+  `registerAs` config namespaces validating **at boot**, one error envelope, `/v1`, a counter seam,
+  and the raw body. 23 tests, up from 5. **ESLint did not exist in this project** despite `AGENTS.md`
+  implying it did, so it was added — minimally, one rule. Two design decisions were revised on contact
+  with the code: raw body stays global (Nest's own option; scoping it would mean hand-wiring the body
+  parser on the one route whose failure is silent), and the error-code union ships five codes, because
+  a filter that catches everything must map 401 and 403 rather than mislabel them `INTERNAL_ERROR`.
+- [034 Determine the Stripe account's billing mode](tickets/034-determine-stripe-billing-mode.md)
+  — **`flexible`**, with `proration_discounts: "included"`, read from four existing subscriptions
+  created weeks apart, so it is the account default rather than a per-object override. Ticket 003
+  guessed the *shape* wrong and the guess was the dangerous kind: `billing_mode` is an object, not a
+  scalar, so `=== 'flexible'` compiles and is always false. Read `billing_mode.type`. Same failure
+  shape as the removed `invoice.paid` boolean.
 - [015 Prototype $0 recurring price and monthly `invoice.paid`](tickets/015-prototype-zero-price-invoice-paid.md)
   — **confirmed**: a $0 recurring price produces one invoice per month indefinitely and emits
   `invoice.paid` each time (`subscription_create` then `subscription_cycle`). Free-tier allocation
@@ -181,16 +216,12 @@ restructured Invoice, and silent version drift would break the credit cron. Rese
 
 ## Not yet specified
 
-- **The implementation tickets themselves.** Cannot be sized until module boundaries (004) and
-  the persistence schema (007) land. Expected to graduate into a series of build tickets.
-- **Billing History materialization**: computed on read versus a materialized view. Depends on 007.
-- **Idempotency on the credit consumption API**: whether consumers supply idempotency keys, and
-  how replays are detected. Depends on 011. Distinct from the allocation idempotency in 016.
-- **Observability**: logging and audit trail approach for Stripe reconciliation.
-- **Demo seed data** for local demonstration.
-- **Stripe `billing_mode`** (`classic` versus `flexible`). Ticket 003 could not determine the
-  default for new accounts, and it materially changes proration credit amounts. Determine the
-  account's mode before finalising any proration expectations.
+- **Observability**: the logging approach for Stripe reconciliation. Narrower than it was — ticket
+  018 gives the service a metrics counter seam, and `SubscriptionEvent` is already the audit trail
+  for reconciliation. What remains unsharp is structured logging: what is logged on a deferral, a
+  dead-letter, or a sync escalation, and in what shape.
+- **Demo seed data** for local demonstration. `prisma/seed.ts` seeds the catalog; a demonstrable
+  user journey needs more, and its shape depends on which flows land first.
 
 Graduated out of the fog by ticket 003: mid-period upgrade and proration, which was previously
 listed here, is now split between ticket 016 (the credit side) and ticket 012 (correcting the
@@ -199,6 +230,29 @@ incorrect refund assumption).
 Graduated by ticket 009: the cron/scheduler mechanism. Allocation is one idempotent routine reached
 from both an in-process schedule and an internal-key endpoint, so the choice no longer has to be
 made — and `INTERNAL_API_KEY` now has a reason to exist.
+
+Graduated on 2026-08-05, once module boundaries (004), the persistence schema (007), the API surface
+(011), and the testing strategy (010) had all landed:
+
+- **The implementation tickets themselves** → the seventeen build tickets 018–034 below, sourced
+  from the 54 clauses still marked `todo` in
+  [`requirement-coverage.md`](../testing/requirement-coverage.md).
+- **Billing History materialization** → folded into
+  [033 Build billing history](tickets/033-build-billing-history.md) as the one decision that ticket
+  makes before writing the query.
+- **Idempotency on the credit consumption API** → already answered by ticket 011: the caller supplies
+  the key and a unique constraint detects the replay. It is built in
+  [021 Build the credit ledger: consumption and reversal](tickets/021-build-credit-consumption.md),
+  not decided again.
+- **Stripe `billing_mode`** → [034 Determine the Stripe account's billing
+  mode](tickets/034-determine-stripe-billing-mode.md). Sharp enough to ticket, and it blocks only
+  031, since ticket 030 chose no proration for price-change migration.
+
+**Coverage gaps found while charting.** `requirement-coverage.md` has **no Section 7 or Section 8
+table**, so add-on purchase and billing history are tracked by nothing, and it carries no rows for the
+self-service subscription or payment-method endpoints. Tickets 031, 032, and 033 each add their
+missing rows before satisfying them. The checklist is this effort's completion criterion, so a
+behaviour absent from it is a behaviour nothing will notice is missing.
 
 ## Out of scope
 
@@ -216,11 +270,30 @@ Ruled beyond this destination. These never graduate.
 
 Frontier (open, unblocked, unclaimed):
 
-- [002 Provision Stripe test account and CLI](tickets/002-provision-stripe-test-account.md) — task — only `stripe listen` forwarding left
+- [002 Provision Stripe test account and CLI](tickets/002-provision-stripe-test-account.md) — task — only `stripe listen` forwarding left, checkable once 024 lands
+- [019 Build the Stripe adapter seam and its test fake](tickets/019-build-stripe-adapter.md) — task — unblocked by 018
+- [020 Build the auth module](tickets/020-build-auth-module.md) — task — unblocked by 018
 
 Blocked:
 
-_None._
+- [021 Build the credit ledger: consumption and reversal](tickets/021-build-credit-consumption.md) — task — 020 — `/tdd`
+- [022 Build the credit ledger: allocation, adjustment, and wallet freeze](tickets/022-build-credit-allocation-and-freeze.md) — task — 021 — `/tdd`
+- [023 Build registration provisioning and the Stripe sync reconciler](tickets/023-build-registration-provisioning.md) — task — 019, 020, 022
+- [024 Build webhook ingestion and the queue worker](tickets/024-build-webhook-ingestion-and-worker.md) — task — 018, 019
+- [025 Build the subscription lifecycle state machine](tickets/025-build-subscription-lifecycle.md) — task — 022, 023 — `/tdd`
+- [026 Build the subscription webhook handlers and the ordering guarantees](tickets/026-build-subscription-webhook-handlers.md) — task — 024, 025
+- [027 Build the invoice webhook handlers and the credit allocation triggers](tickets/027-build-invoice-handlers-and-allocation.md) — task — 022, 024, 025
+- [028 Build the annual allocation cron and the internal endpoints](tickets/028-build-annual-allocation-cron.md) — task — 027
+- [029 Build the plan and add-on catalog with admin CRUD](tickets/029-build-plan-catalog-admin.md) — task — 019, 020
+- [030 Build the price change and subscriber migration reconciler](tickets/030-build-price-change-migration.md) — task — 029
+- [031 Build subscription self-service and payment methods](tickets/031-build-subscription-self-service.md) — task — 023, 025, 029, 034
+- [032 Build add-on credit purchase](tickets/032-build-addon-purchase.md) — task — 027, 029, 031
+- [033 Build billing history](tickets/033-build-billing-history.md) — task — 021, 025, 027
+
+Every build ticket names the requirement clauses it closes. Between them tickets 018–033 account for
+all 54 clauses still marked `todo` in
+[`requirement-coverage.md`](../testing/requirement-coverage.md), which is this effort's completion
+criterion.
 
 Closed:
 
@@ -240,3 +313,5 @@ Closed:
 - [015 Prototype $0 recurring price and monthly `invoice.paid`](tickets/015-prototype-zero-price-invoice-paid.md) — prototype
 - [016 Decide the credit allocation trigger and idempotency key](tickets/016-decide-credit-allocation-trigger.md) — grilling
 - [017 Design out-of-order webhook handling](tickets/017-design-out-of-order-webhook-handling.md) — grilling
+- [034 Determine the Stripe account's billing mode](tickets/034-determine-stripe-billing-mode.md) — task
+- [018 Build the common layer](tickets/018-build-common-layer.md) — task — OpenSpec change `build-common-layer`
