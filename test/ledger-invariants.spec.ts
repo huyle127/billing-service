@@ -117,6 +117,38 @@ describe('ledger invariants enforced by the database', () => {
     expect(rows).toHaveLength(2);
   });
 
+  it('requirements section 6 — a consumption can be reversed at most once', async () => {
+    const { wallet } = await aUserWithWallet(100, 0);
+    const consumption = await prisma.creditTransaction.create({
+      data: {
+        walletId: wallet.id,
+        ledger: 'SUBSCRIPTION',
+        type: 'CONSUMPTION',
+        amount: -30,
+        balanceAfter: 70,
+        idempotencyKey: 'consume:job-2',
+      },
+    });
+
+    const reversal = {
+      walletId: wallet.id,
+      ledger: 'SUBSCRIPTION',
+      type: 'REVERSAL',
+      amount: 30,
+      balanceAfter: 100,
+      reversesId: consumption.id,
+    } as const;
+
+    await prisma.creditTransaction.create({ data: reversal });
+
+    await expect(prisma.creditTransaction.create({ data: reversal })).rejects.toThrow();
+
+    const rows = await prisma.creditTransaction.findMany({
+      where: { reversesId: consumption.id },
+    });
+    expect(rows).toHaveLength(1);
+  });
+
   it('each test starts from a truncated database', async () => {
     expect(await prisma.user.count()).toBe(0);
     expect(await prisma.creditTransaction.count()).toBe(0);

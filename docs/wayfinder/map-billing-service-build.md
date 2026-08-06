@@ -115,6 +115,17 @@ covered the table has served its purpose and can retire in favour of the specs.
   — processing never assumes event ordering. Re-fetch the object from Stripe on receipt, guard
   period-derived state monotonically, defer rather than fail when the subject is missing, and
   enforce idempotency at two layers. Replaying full history must converge on the ordered result.
+- [021 Build the credit ledger: consumption and reversal](tickets/021-build-credit-consumption.md)
+  — the hot path is built and all eight Section 6 consumption clauses are covered; `FOR UPDATE`
+  behaved as ticket 006 measured. **The published consume response was wrong**: one `transactionId`
+  cannot name the two rows a two-ledger consumption writes, so it is now
+  `transactions: [{ id, ledger, amount }]` — affordable only because no application has integrated
+  yet. Three orderings settled: **replay outranks the freeze** (a retry must not be told its spent
+  credits are still there), a second reversal replays rather than failing, and reversal rows carry no
+  idempotency key or they collide with the consumption's own. Two findings for later tickets: the
+  global auth guard belongs in `auth.module.ts` and the identity contract in `common/identity/`, or
+  a leaf module cannot read a caller without closing a cycle; and **Prisma's 2s default `maxWait`
+  turns queued callers into server errors**, which the concurrency requirement forbids.
 - [012 Correct the requirements and domain model from Stripe research](tickets/012-correct-docs-from-stripe-research.md)
   — both factual errors fixed: the cron now reads a paid-through boundary we own and persist from
   `invoice.period_end`, and proration credits replace the non-existent Stripe-initiated refunds.
@@ -346,4 +357,5 @@ Closed:
 - [034 Determine the Stripe account's billing mode](tickets/034-determine-stripe-billing-mode.md) — task
 - [018 Build the common layer](tickets/018-build-common-layer.md) — task — OpenSpec change `build-common-layer`
 - [019 Build the Stripe adapter seam and its test fake](tickets/019-build-stripe-adapter.md) — task — OpenSpec change `build-stripe-adapter`, archived; capability spec [`stripe-adapter`](../../openspec/specs/stripe-adapter/spec.md)
-- [020 Build the auth module](tickets/020-build-auth-module.md) — task — OpenSpec change `build-auth-module`; four of six Section 9 clauses, the internal API key deferred to 023
+- [020 Build the auth module](tickets/020-build-auth-module.md) — task — OpenSpec change `build-auth-module`, archived; capability spec [`authentication`](../../openspec/specs/authentication/spec.md); four of six Section 9 clauses, the internal API key deferred to 023
+- [021 Build the credit ledger: consumption and reversal](tickets/021-build-credit-consumption.md) — task — OpenSpec change `build-credit-consumption`; all eight Section 6 consumption clauses

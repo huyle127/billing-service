@@ -204,6 +204,25 @@ never on the auth module's storage.
 `user` is separate precisely so this removal is possible: `User` is what billing holds foreign keys
 against, and it survives the auth module's deletion, becoming a projection synced from upstream.
 
+**How a module downstream of `auth` is authenticated without importing it.** A controller in `credit`
+or `billing` needs the caller's identity, but importing `JwtAuthGuard` would give
+`auth ──▶ billing ──▶ credit ──▶ auth`, a cycle this document forbids. Two rules keep the graph
+acyclic:
+
+- **The guard is registered once, as an `APP_GUARD` in `auth.module.ts`**, so every route in a module
+  graph containing `auth` is authenticated by default and no controller applies it by hand.
+  Registering it at the composition root instead was tried and rejected: a test harness that composes
+  modules directly then runs weaker semantics than production, which is how a route silently loses
+  its guard.
+- **`common/identity/` publishes the shape of a verified identity** — `AuthenticatedUser`, the
+  `RequestWithUser` type that names the request property, `@CurrentUser()`, and `@Public()` for the
+  routes that opt out. Every module is downstream of `common`, so reading an identity adds no edge.
+  `auth` keeps the guard that produces it, and an upstream Authentication Service arrives as a
+  different guard filling the same property.
+
+A route that must skip authentication says so with `@Public()`. Forgetting it breaks that route
+loudly, where forgetting `@UseGuards` would have left one open silently.
+
 **The Stripe seam.** `billing/stripe/` is the only place Stripe SDK types appear. Everything above it
 sees domain types. This is a real seam with a second adapter — the test fake — not a hypothetical
 one.

@@ -14,9 +14,3 @@ export interface JwtPayload {
   tokenType: TokenType;
   jti?: string;
 }
-
-export interface AuthenticatedUser {
-  id: string;
-  email: string;
-  role: Role;
-}

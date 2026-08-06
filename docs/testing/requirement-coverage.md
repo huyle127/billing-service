@@ -56,14 +56,14 @@ Status: `covered` · `partial` · `todo`
 | --- | --- | --- |
 | A balance can never go negative | `ledger-invariants: balance can never go negative` | covered |
 | One consumption spans both ledgers under one key | `ledger-invariants: one consumption spans both ledgers` | covered |
-| Consumption is atomic — no partial deduction | | todo |
-| Subscription credits are drawn before add-on credits | | todo |
-| Concurrent consumption cannot oversell | | todo |
-| Consumption is idempotent on the caller's key | | todo |
-| Reversal restores credits to the ledger they came from | | todo |
-| A consumption can be reversed at most once | | todo |
-| Declines report `INSUFFICIENT_CREDITS` and `BILLING_FROZEN` distinctly | | todo |
-| A decline emits a metric | | todo |
+| Consumption is atomic — no partial deduction | `credit.service: deducts the whole amount / deducts nothing when the amount exceeds both ledgers` | covered |
+| Subscription credits are drawn before add-on credits | `draw-split: exhausts subscription before add-on; credit.service: spans both ledgers, subscription first` | covered |
+| Concurrent consumption cannot oversell | `credit-concurrency: never oversells a wallet the callers collectively exceed` | covered |
+| Consumption is idempotent on the caller's key | `credit.service: replays the first result for a repeated key; credit-concurrency: charges once when one key is retried in parallel` | covered |
+| Reversal restores credits to the ledger they came from | `credit.service: reverses a two-ledger consumption back to both ledgers / restores to the ledger the credits came from` | covered |
+| A consumption can be reversed at most once | `ledger-invariants: a consumption can be reversed at most once; credit.service: replays the first reversal` | covered |
+| Declines report `INSUFFICIENT_CREDITS` and `BILLING_FROZEN` distinctly | `credit.service: declines a shortfall and a frozen wallet distinctly; credit-http: reports a decline as a 200 carrying no transactions` | covered |
+| A decline emits a metric | `credit.service: counts every decline by reason / counts nothing for a transaction that rolled back` | covered |
 | Wallet freezes when a subscription goes past due | | todo |
 | Resolving past due unfreezes and allocates the next period | | todo |
 | Add-on credits survive a freeze and never expire | | todo |

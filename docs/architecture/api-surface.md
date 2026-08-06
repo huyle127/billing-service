@@ -91,7 +91,9 @@ reached yet.
 
 ## Credit consumption
 
-The hot path, called by other applications rather than by a browser.
+The hot path, called by other applications rather than by a browser. Both routes require a user
+access token and act on that token holder's wallet; neither accepts a user id, and a body carrying
+one is rejected by the global validation pipe.
 
 ```
 POST /v1/credits/consume
@@ -99,7 +101,7 @@ POST /v1/credits/consume
 
 200 { "success": true,  "consumed": { "subscription": 10, "addon": 0 },
                         "balance": { "subscription": 40, "addon": 0 },
-                        "transactionId": "…" }
+                        "transactions": [ { "id": "…", "ledger": "SUBSCRIPTION", "amount": -10 } ] }
 
 200 { "success": false, "reason": "INSUFFICIENT_CREDITS",
                         "balance": { "subscription": 3, "addon": 0 },
@@ -108,6 +110,14 @@ POST /v1/credits/consume
 200 { "success": false, "reason": "BILLING_FROZEN",
                         "balance": { "subscription": 40, "addon": 0 } }
 ```
+
+**The success response lists every row it wrote, not one id.** A consumption drawing on both ledgers
+writes one row per ledger — that is what the composite uniqueness constraint exists for — so a single
+`transactionId` could only ever name one of them and would hide the other from any caller
+reconciling against the ledger. Amounts are the stored row amounts, negative for a consumption.
+
+**A decline omits `transactions` entirely.** It wrote no row, and an empty array would suggest rows
+exist that were merely not listed.
 
 **Credits are deducted before the caller does its work.** Deducting afterwards would let ten
 concurrent requests against a balance of five all complete before any balance check bit — the
@@ -134,10 +144,23 @@ applications already expect them.
 ```
 POST /v1/credits/reverse
   { "idempotencyKey": "job-8f21c4" }
+
+200 { "restored": { "subscription": 10, "addon": 0 },
+      "balance": { "subscription": 50, "addon": 0 },
+      "transactions": [ { "id": "…", "ledger": "SUBSCRIPTION", "amount": 10 } ] }
 ```
 
 Returns credits to the ledger they were drawn from, as a `reversal` transaction linked to the
-original. A consumption can be reversed at most once, enforced by a unique constraint.
+original. A consumption can be reversed at most once, enforced by a unique constraint. A repeated
+reversal returns the first one's result, for the same reason a repeated consumption replays.
+
+**The reversal response carries no `success` field.** Reversal has no business outcome to decline: a
+frozen wallet is reversed anyway, and a key with no consumption behind it is a `404`. Its result is
+carried by the status code alone.
+
+Reversal rows carry no idempotency key. Copying the consumption's key would collide with the
+consumption's own row on the composite constraint; the link is `reversesId`, and that is what bounds
+a consumption to one reversal.
 
 Reversal exists because `adjustment` is admin-authorised and restricted to Add-on Credits — without
 it there is no legitimate way to return Subscription Credits after a failed operation.

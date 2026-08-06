@@ -8,6 +8,7 @@ import { AppConfigModule } from './common/config/config.module';
 import { configurations } from './common/config/configuration';
 import { MetricsModule } from './common/metrics/metrics.module';
 import { PrismaModule } from './common/prisma/prisma.module';
+import { CreditModule } from './credit/credit.module';
 import { UserModule } from './user/user.module';
 
 @Module({
@@ -21,6 +22,7 @@ import { UserModule } from './user/user.module';
     StripeModule,
     UserModule,
     AuthModule,
+    CreditModule,
   ],
 })
 export class AppModule {}
