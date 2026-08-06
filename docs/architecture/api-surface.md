@@ -182,6 +182,36 @@ The adjustment route rejects any attempt to target subscription credits. That re
 enforced in the service, not the controller — it is a domain rule, and routing it through the
 controller would leave it unenforced on any other caller.
 
+```
+POST /v1/admin/users/:userId/credits/adjust
+  { "amount": 25, "reason": "support goodwill" }
+
+200 { "subscription": 100, "addon": 75 }
+```
+
+**The route acts on the user named in the path, not on the caller.** Every other credit route reads
+its subject from the token; this is the one that operates on someone else's wallet, which is exactly
+why it is the one that requires an admin role. The response is the wallet's balances after the
+adjustment.
+
+`amount` is a non-zero integer, positive to credit and negative to debit. `reason` is required: an
+adjustment is a manual intervention in a money ledger and the history has to say who did what and
+why. The DTO declares those two properties and no others, so a body naming a ledger is `400`
+`VALIDATION_FAILED` from the global pipe rather than being silently ignored.
+
+| Request | Response |
+| --- | --- |
+| Debit larger than the add-on balance | `400` with `ADJUSTMENT_EXCEEDS_BALANCE` |
+| Amount of zero, a fraction, or a body naming a ledger | `400` with `VALIDATION_FAILED` |
+| User token | `403` with `FORBIDDEN` |
+| No token | `401` with `UNAUTHORIZED` |
+| User holds no wallet | `404` with `NOT_FOUND` |
+
+`ADJUSTMENT_EXCEEDS_BALANCE` is a client fault, not a decline. The request was well-formed and only
+the wallet's state made it impossible, so it does not reuse `VALIDATION_FAILED`; and it is
+deliberately not the `INSUFFICIENT_CREDITS` decline, which is a `200` response contract. Answering
+`200` here would leave an admin believing the adjustment happened.
+
 A price change on `PATCH /v1/admin/plans/:id` creates a new Stripe Price and schedules existing
 subscribers for migration at their next renewal. It returns immediately; migration is driven by the
 state-derived reconciler described in the Plan Catalog Management section of the requirements.

@@ -7,15 +7,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { seedAdmin } from '../prisma/seed-admin';
 import { AuthModule } from '../src/auth/auth.module';
 import { TOKEN_TYPES } from '../src/auth/auth.constants';
-import { Roles } from '../src/auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../src/auth/guards/roles.guard';
 import { AppConfigModule } from '../src/common/config/config.module';
 import { AppConfigService } from '../src/common/config/app-config.service';
 import { configurations } from '../src/common/config/configuration';
 import { DomainExceptionFilter } from '../src/common/errors/domain-exception.filter';
 import { AuthenticatedUser } from '../src/common/identity/authenticated-user';
 import { CurrentUser } from '../src/common/identity/current-user.decorator';
+import { Roles } from '../src/common/identity/roles.decorator';
 import { PrismaModule } from '../src/common/prisma/prisma.module';
 import { PrismaService } from '../src/common/prisma/prisma.service';
 
@@ -30,7 +29,6 @@ class ProbeController {
   }
 
   @Get('admin')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   admin(): { ok: true } {
     return { ok: true };

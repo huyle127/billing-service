@@ -54,7 +54,7 @@ Status: `covered` · `partial` · `todo`
 
 | Clause | Test | Status |
 | --- | --- | --- |
-| A balance can never go negative | `ledger-invariants: balance can never go negative` | covered |
+| A balance can never go negative | `ledger-invariants: neither balance can go negative, which is what an over-large adjustment leans on` | covered |
 | One consumption spans both ledgers under one key | `ledger-invariants: one consumption spans both ledgers` | covered |
 | Consumption is atomic — no partial deduction | `credit.service: deducts the whole amount / deducts nothing when the amount exceeds both ledgers` | covered |
 | Subscription credits are drawn before add-on credits | `draw-split: exhausts subscription before add-on; credit.service: spans both ledgers, subscription first` | covered |
@@ -66,13 +66,16 @@ Status: `covered` · `partial` · `todo`
 | A decline emits a metric | `credit.service: counts every decline by reason / counts nothing for a transaction that rolled back` | covered |
 | Wallet freezes when a subscription goes past due | | todo |
 | Resolving past due unfreezes and allocates the next period | | todo |
-| Add-on credits survive a freeze and never expire | | todo |
+| Add-on credits survive a freeze and never expire | `credit.service: takes nothing and records nothing when a wallet is frozen / refuses a draw the add-on ledger could satisfy, and allows it again once unfrozen / changes nothing when a frozen wallet is frozen or an active one unfrozen` | covered |
+| A freeze gates consumption only — allocation, adjustment and reset still apply | `credit.service: lets a frozen wallet be allocated to, adjusted, and reset` | covered |
+| Expiry forfeits what the subscription ledger still holds | `credit.service: forfeits what the subscription ledger holds and leaves add-on standing / writes no row when there is nothing left to forfeit` | covered |
 | Allocation grants on `subscription_create`, `_cycle`, and `_update` only | | todo |
 | Payment detected via `invoice.status`, never the removed `paid` field | | todo |
 | Free tier allocates monthly from `invoice.paid` with no separate cron | | todo |
 | A mid-cycle plan change grants a full new monthly allocation | | todo |
-| Allocation is idempotent on subscription and month | | todo |
-| Admin adjustments target add-on credits only | | todo |
+| Allocation is idempotent on subscription and month | `credit.service: grants nothing further for a repeated key and names the first row / grants twice for two keys the ledger cannot tell apart; ledger-invariants: an allocation key is spent once per ledger, as a consumption key is` | covered |
+| A renewal replaces subscription credits; unused credits do not roll over | `credit.service: lands a replacing grant on the plan amount and forfeits the remainder / does not zero a balance twice when a replacing grant is retried / adds a non-replacing grant, and refuses to replace the add-on ledger` | covered |
+| Admin adjustments target add-on credits only | `credit.service: credits and debits the add-on ledger alone, carrying the admin reason / refuses a debit larger than the add-on ledger and allows one down to zero / leaves the subscription ledger unreachable by any adjustment; credit-http: adjusts the wallet named in the path for an admin, and nobody else / refuses a malformed adjustment, a named ledger, and a debit the wallet cannot cover` | covered |
 
 ## Section 9 — Authentication
 

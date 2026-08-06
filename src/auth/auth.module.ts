@@ -2,10 +2,10 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { AppConfigService } from '../common/config/app-config.service';
+import { RolesGuard } from '../common/identity/roles.guard';
 import { UserModule } from '../user/user.module';
 import { AuthController } from './controllers/auth.controller';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { RolesGuard } from './guards/roles.guard';
 import { AuthService } from './services/auth.service';
 
 const ALGORITHM = 'HS256';
@@ -28,6 +28,7 @@ const ALGORITHM = 'HS256';
     JwtAuthGuard,
     RolesGuard,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
   ],
   exports: [JwtModule, JwtAuthGuard, RolesGuard],
 })

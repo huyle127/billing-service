@@ -146,7 +146,9 @@ The paid-through boundary is owned and persisted by the Billing Service, recorde
 
 Credits are allocated on `invoice.paid` only for the billing reasons listed under Credit Allocation Triggers in §6.
 
-Subscription Credits reset according to the Subscription plan and billing cycle.
+Subscription Credits reset according to the Subscription plan and billing cycle: **a renewal replaces the balance rather than adding to it, and unused Subscription Credits do not roll over.** A wallet holding 30 unused credits that renews on a 200-credit plan lands on 200, not 230. The forfeited remainder is recorded as a Credit Transaction of type `reset` before the new period's allocation, so the history shows what was taken as well as what was granted.
+
+This is not in conflict with the mid-cycle rule in §6, which adds. A renewal and a plan change are different events: the renewal starts a new entitlement period and replaces what the last one left behind, while an upgrade grants the new plan on top of the period the user has already paid for. The caller tells the credit ledger which of the two it is; the ledger knows nothing about billing periods and cannot infer it.
 
 When a Subscription expires, its associated Subscription Credits are forfeited.
 
@@ -377,11 +379,13 @@ The system should support:
 | `billing_reason` | Meaning | Allocation |
 | --- | --- | --- |
 | `subscription_create` | First invoice for a new subscription | Allocate the plan's monthly credits. |
-| `subscription_cycle` | Scheduled renewal at the period boundary | Allocate the plan's monthly credits. |
+| `subscription_cycle` | Scheduled renewal at the period boundary | Allocate the plan's monthly credits, **replacing** whatever the last period left. |
 | `subscription_update` | Mid-cycle plan change with proration | Allocate the new plan's monthly credits. **Intentional business rule** — see below. |
 | `manual`, `subscription_threshold`, other | Not a subscription period event | No allocation. |
 
 **Mid-cycle plan changes grant a full monthly allocation of the new plan.** A user who upgrades mid-period receives the new plan's credits immediately, in addition to what they already hold for the current period. This is a deliberate product decision, not an accounting error: the upgrade is treated as the start of entitlement to the new plan rather than as a prorated adjustment. Proration of the *money* is handled by Stripe independently; credits are not prorated.
+
+**A renewal is the opposite: it replaces the balance.** `subscription_cycle` and the annual cron's month boundary forfeit whatever the last period left before granting, because Subscription Credits do not roll over — see the Subscription Credits section. The two rules coexist because they are different events, and the caller says which one it is: allocation takes the intent as a flag, since the credit ledger has no knowledge of billing periods and could not tell them apart. Both the `reset` row and the `allocation` row are written by that one call, so a retry cannot zero a balance it has already granted.
 
 **Allocation is idempotent on the subscription and the month, not on the event or the invoice.** A single month's entitlement can be reached from three independent paths: the `invoice.paid` webhook, the monthly cron for annual subscriptions, and the initial grant at registration. Keying on the invoice would not stop these overlapping, because the cron and the registration grant have no invoice at all.
 

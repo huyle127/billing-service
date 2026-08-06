@@ -55,8 +55,17 @@ exists so the service is self-contained for development and demonstration. It is
 replaced by an upstream Authentication Service, so it must be built as a replaceable seam:
 billing code depends on a verified identity and role, never on the auth module's tables.
 
-**Working discipline.** TDD (`/tdd`) for the credit ledger and subscription lifecycle rules;
-tests written after implementation for controllers, Prisma wiring, and configuration.
+**Working discipline.** This is a learning project, and the point is understanding the build, not
+coverage. **Test what can break silently, and nothing else** — row locking and concurrency, database
+constraints (asserted by violating them), idempotency and replay paths, money arithmetic, and pure
+transition tables. Everything else is written without tests: controllers, Prisma wiring,
+configuration, and anything the type system or the global validation pipe already refuses.
+
+One test per risk, not one per scenario. A change's `tasks.md` carries a single test task for each
+part that holds real risk rather than a "written test-first" subsection per section — the
+`build-credit-allocation-and-freeze` change shipped 20 tests where 7 or 8 would have said the same
+thing. Amended 2026-08-06, replacing a blanket `/tdd` for the credit ledger and subscription
+lifecycle.
 
 **Rules from `AGENTS.md`** that every session must honour: business logic stays out of
 controllers; Stripe is an infrastructure adapter; state-changing operations use transactions;
@@ -68,7 +77,7 @@ restructured Invoice, and silent version drift would break the credit cron. Rese
 [`docs/research/stripe-object-model.md`](../research/stripe-object-model.md) reflect
 `2026-07-29.dahlia`.
 
-**Skills to consult.** `/tdd`, `/codebase-design`, `/domain-modeling`, `/setup-pre-commit`.
+**Skills to consult.** `/codebase-design`, `/domain-modeling`, `/setup-pre-commit`.
 
 **OpenSpec runs alongside this map** as of 2026-08-05 (`openspec/`, schema `spec-driven`). Two
 systems, one route — the split is fixed so they cannot drift:
@@ -126,6 +135,17 @@ covered the table has served its purpose and can retire in favour of the specs.
   global auth guard belongs in `auth.module.ts` and the identity contract in `common/identity/`, or
   a leaf module cannot read a caller without closing a cycle; and **Prisma's 2s default `maxWait`
   turns queued callers into server errors**, which the concurrency requirement forbids.
+- [022 Build the credit ledger: allocation, adjustment, and wallet freeze](tickets/022-build-credit-allocation-and-freeze.md)
+  — `allocate`, `reset`, `freeze`, `unfreeze` and `adjust` are built, all four remaining Section 6
+  clauses covered, no schema change. **Subscription credits do not roll over**: a renewal replaces the
+  balance and a mid-cycle plan change adds, which resolves the requirements' apparent contradiction.
+  The ledger cannot tell the two apart, so the caller passes the intent as a required flag, and the
+  `RESET` and `ALLOCATION` legs are written by one call — two calls are not idempotent as a pair.
+  **A `P2002` cannot be translated into a replay inside a caller's transaction**, because a unique
+  violation aborts it and every later statement fails `25P02`; the wallet lock is the guarantee
+  instead, and a surviving collision is cross-wallet, where a replay would answer with someone else's
+  row. Also: two rows written in one transaction share a `createdAt`, so `now()` cannot order a
+  ledger's history.
 - [012 Correct the requirements and domain model from Stripe research](tickets/012-correct-docs-from-stripe-research.md)
   — both factual errors fixed: the cron now reads a paid-through boundary we own and persist from
   `invoice.period_end`, and proration credits replace the non-existent Stripe-initiated refunds.
@@ -313,16 +333,14 @@ Ruled beyond this destination. These never graduate.
 Frontier (open, unblocked, unclaimed):
 
 - [002 Provision Stripe test account and CLI](tickets/002-provision-stripe-test-account.md) — task — only `stripe listen` forwarding left, checkable once 024 lands
-- [021 Build the credit ledger: consumption and reversal](tickets/021-build-credit-consumption.md) — task — unblocked by 020 — `/tdd`
 - [024 Build webhook ingestion and the queue worker](tickets/024-build-webhook-ingestion-and-worker.md) — task — unblocked by 019
 - [029 Build the plan and add-on catalog with admin CRUD](tickets/029-build-plan-catalog-admin.md) — task — unblocked by 020
 - [035 Decide whether imports use the `@/` path alias](tickets/035-decide-import-path-alias.md) — task — cheapest while only twelve files exist
+- [023 Build registration provisioning and the Stripe sync reconciler](tickets/023-build-registration-provisioning.md) — task — unblocked by 022
 
 Blocked:
 
-- [022 Build the credit ledger: allocation, adjustment, and wallet freeze](tickets/022-build-credit-allocation-and-freeze.md) — task — 021 — `/tdd`
-- [023 Build registration provisioning and the Stripe sync reconciler](tickets/023-build-registration-provisioning.md) — task — 020, 022
-- [025 Build the subscription lifecycle state machine](tickets/025-build-subscription-lifecycle.md) — task — 022, 023 — `/tdd`
+- [025 Build the subscription lifecycle state machine](tickets/025-build-subscription-lifecycle.md) — task — 023 — test the transition table only
 - [026 Build the subscription webhook handlers and the ordering guarantees](tickets/026-build-subscription-webhook-handlers.md) — task — 024, 025
 - [027 Build the invoice webhook handlers and the credit allocation triggers](tickets/027-build-invoice-handlers-and-allocation.md) — task — 022, 024, 025
 - [028 Build the annual allocation cron and the internal endpoints](tickets/028-build-annual-allocation-cron.md) — task — 027

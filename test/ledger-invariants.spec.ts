@@ -28,8 +28,8 @@ describe('ledger invariants enforced by the database', () => {
     return { user, wallet };
   }
 
-  it('requirements section 6 — a balance can never go negative', async () => {
-    const { wallet } = await aUserWithWallet(10, 0);
+  it('requirements section 6 — neither balance can go negative, which is what an over-large adjustment leans on', async () => {
+    const { wallet } = await aUserWithWallet(10, 30);
 
     await expect(
       prisma.creditWallet.update({
@@ -38,8 +38,15 @@ describe('ledger invariants enforced by the database', () => {
       }),
     ).rejects.toThrow();
 
+    await expect(
+      prisma.creditWallet.update({
+        where: { id: wallet.id },
+        data: { addonCredits: { decrement: 31 } },
+      }),
+    ).rejects.toThrow();
+
     const after = await prisma.creditWallet.findUniqueOrThrow({ where: { id: wallet.id } });
-    expect(after.subscriptionCredits).toBe(10);
+    expect(after).toMatchObject({ subscriptionCredits: 10, addonCredits: 30 });
   });
 
   it('requirements section 3 — a user has at most one current subscription', async () => {
@@ -112,6 +119,29 @@ describe('ledger invariants enforced by the database', () => {
         },
       }),
     ).rejects.toThrow();
+
+    const rows = await prisma.creditTransaction.findMany({ where: { idempotencyKey: key } });
+    expect(rows).toHaveLength(2);
+  });
+
+  it('requirements section 6 — an allocation key is spent once per ledger, as a consumption key is', async () => {
+    const { wallet } = await aUserWithWallet(0, 0);
+    const key = 'allocate:sub_1:2026-08';
+    const allocation = {
+      walletId: wallet.id,
+      ledger: 'SUBSCRIPTION',
+      type: 'ALLOCATION',
+      amount: 200,
+      balanceAfter: 200,
+      idempotencyKey: key,
+    } as const;
+
+    await prisma.creditTransaction.create({ data: allocation });
+    await prisma.creditTransaction.create({
+      data: { ...allocation, ledger: 'ADDON', amount: 50, balanceAfter: 50 },
+    });
+
+    await expect(prisma.creditTransaction.create({ data: allocation })).rejects.toThrow();
 
     const rows = await prisma.creditTransaction.findMany({ where: { idempotencyKey: key } });
     expect(rows).toHaveLength(2);

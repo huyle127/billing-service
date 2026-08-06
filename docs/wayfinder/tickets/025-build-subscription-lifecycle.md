@@ -12,8 +12,11 @@
 
 The transitions, who sets them, and what each one writes.
 
-**Use `/tdd`.** The map names subscription lifecycle rules as the second area built test-first. The
-transition function is pure — no database, no Stripe — which is exactly where `/tdd` pays.
+**Test the transition table, and little else.** The map's working discipline no longer asks for
+blanket TDD, but the transition function stays worth testing under the rule that replaced it: it is
+pure — no database, no Stripe — and a wrong branch in a state machine fails silently rather than
+loudly. One test driving the whole table, not one per transition. The handlers and wiring around it
+are written without tests.
 
 - **The states are ours.** Stripe events are inputs that trigger transitions; **no business rule
   branches on a Stripe status value.** `stripeStatus` is stored verbatim for reconciliation and audit

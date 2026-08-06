@@ -25,6 +25,14 @@ export class CreditWalletRepository {
     return wallet;
   }
 
+  async setStatus(
+    tx: Prisma.TransactionClient,
+    walletId: string,
+    status: WalletStatus,
+  ): Promise<void> {
+    await tx.creditWallet.update({ where: { id: walletId }, data: { status } });
+  }
+
   async setBalances(
     tx: Prisma.TransactionClient,
     walletId: string,

@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';
-import { WalletStatus } from '@prisma/client';
+import { CreditLedger, WalletStatus } from '@prisma/client';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { InMemoryMetrics } from '../../common/metrics/in-memory-metrics';
 import { MetricsModule } from '../../common/metrics/metrics.module';
@@ -8,8 +8,8 @@ import { PrismaModule } from '../../common/prisma/prisma.module';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreditModule } from '../credit.module';
 import { DECLINE_COUNTER, DECLINE_REASON_LABEL, DECLINE_REASONS } from '../credit.constants';
-import { IdempotencyKeyReusedError } from '../credit.errors';
-import { CreditService } from './credit.service';
+import { AdjustmentExceedsBalanceError, IdempotencyKeyReusedError } from '../credit.errors';
+import { AllocateRequest, CreditService } from './credit.service';
 
 describe('the credit ledger', () => {
   let moduleRef: TestingModule;
@@ -56,6 +56,30 @@ describe('the credit ledger', () => {
 
   function declineCount(reason: string): number {
     return metrics.valueOf(DECLINE_COUNTER, { [DECLINE_REASON_LABEL]: reason });
+  }
+
+  function allocate(userId: string, request: AllocateRequest) {
+    return prisma.$transaction((tx) => credit.allocate(tx, userId, request));
+  }
+
+  function freeze(userId: string) {
+    return prisma.$transaction((tx) => credit.freeze(tx, userId));
+  }
+
+  function unfreeze(userId: string) {
+    return prisma.$transaction((tx) => credit.unfreeze(tx, userId));
+  }
+
+  function rowsOf(walletId: string) {
+    return prisma.creditTransaction.findMany({ where: { walletId } });
+  }
+
+  async function byType(walletId: string) {
+    const rows = await rowsOf(walletId);
+
+    return Object.fromEntries(
+      rows.map((row) => [row.type, [row.amount, row.balanceAfter, row.idempotencyKey]]),
+    );
   }
 
   it('deducts the whole amount and records the row it wrote', async () => {
@@ -371,5 +395,405 @@ describe('the credit ledger', () => {
     await expect(credit.reverse(userId, 'never-consumed')).rejects.toMatchObject({
       code: 'NOT_FOUND',
     });
+  });
+
+  it('commits a grant with the caller transaction and rolls it back with it', async () => {
+    const { userId, walletId } = await aWallet(0, 0);
+
+    const committed = await allocate(userId, {
+      ledger: CreditLedger.SUBSCRIPTION,
+      amount: 200,
+      idempotencyKey: 'grant-1',
+      replacing: false,
+    });
+
+    expect(committed.balance).toEqual({ subscription: 200, addon: 0 });
+    expect(await balanceOf(walletId)).toMatchObject({ subscriptionCredits: 200 });
+
+    await expect(
+      prisma.$transaction(async (tx) => {
+        await credit.allocate(tx, userId, {
+          ledger: CreditLedger.SUBSCRIPTION,
+          amount: 50,
+          idempotencyKey: 'grant-2',
+          replacing: false,
+        });
+
+        throw new Error('the caller failed after granting');
+      }),
+    ).rejects.toThrow('the caller failed after granting');
+
+    expect(await balanceOf(walletId)).toMatchObject({ subscriptionCredits: 200 });
+    expect(await prisma.creditTransaction.findMany({ where: { idempotencyKey: 'grant-2' } })).toEqual(
+      [],
+    );
+
+    const stranger = await prisma.user.create({
+      data: { email: `${crypto.randomUUID()}@example.test` },
+    });
+    await expect(
+      allocate(stranger.id, {
+        ledger: CreditLedger.SUBSCRIPTION,
+        amount: 10,
+        idempotencyKey: 'grant-3',
+        replacing: false,
+      }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('grants to the ledger it names and leaves the other one alone', async () => {
+    const subscription = await aWallet(0, 40);
+    const addon = await aWallet(30, 0);
+
+    const granted = await allocate(subscription.userId, {
+      ledger: CreditLedger.SUBSCRIPTION,
+      amount: 200,
+      idempotencyKey: 'grant-4',
+      replacing: false,
+    });
+
+    expect(granted.balance).toEqual({ subscription: 200, addon: 40 });
+
+    const rows = await rowsOf(subscription.walletId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      ledger: 'SUBSCRIPTION',
+      type: 'ALLOCATION',
+      amount: 200,
+      balanceAfter: 200,
+      idempotencyKey: 'grant-4',
+    });
+    expect(granted.transaction).toEqual({ id: rows[0].id, ledger: 'SUBSCRIPTION', amount: 200 });
+
+    const bought = await allocate(addon.userId, {
+      ledger: CreditLedger.ADDON,
+      amount: 100,
+      idempotencyKey: 'grant-5',
+      replacing: false,
+    });
+
+    expect(bought.balance).toEqual({ subscription: 30, addon: 100 });
+    expect(await rowsOf(addon.walletId)).toMatchObject([
+      { ledger: 'ADDON', type: 'ALLOCATION', amount: 100, balanceAfter: 100 },
+    ]);
+  });
+
+  it('grants nothing further for a repeated key and names the first row', async () => {
+    const { userId, walletId } = await aWallet(0, 0);
+    const request: AllocateRequest = {
+      ledger: CreditLedger.SUBSCRIPTION,
+      amount: 200,
+      idempotencyKey: 'grant-6',
+      replacing: false,
+    };
+
+    const first = await allocate(userId, request);
+    const second = await allocate(userId, request);
+
+    expect(second).toEqual(first);
+    expect(await rowsOf(walletId)).toHaveLength(1);
+    expect(await balanceOf(walletId)).toMatchObject({ subscriptionCredits: 200 });
+  });
+
+  it('grants twice for two keys the ledger cannot tell apart', async () => {
+    const { userId, walletId } = await aWallet(0, 0);
+
+    await allocate(userId, {
+      ledger: CreditLedger.SUBSCRIPTION,
+      amount: 200,
+      idempotencyKey: 'august-by-invoice',
+      replacing: false,
+    });
+    const second = await allocate(userId, {
+      ledger: CreditLedger.SUBSCRIPTION,
+      amount: 200,
+      idempotencyKey: 'august-by-cron',
+      replacing: false,
+    });
+
+    expect(second.balance).toEqual({ subscription: 400, addon: 0 });
+    expect(await rowsOf(walletId)).toHaveLength(2);
+  });
+
+  it('records a Stripe invoice and a period start, and grants without either', async () => {
+    const reconciled = await aWallet(0, 0);
+    const bare = await aWallet(0, 0);
+    const periodStart = new Date('2026-08-01T00:00:00.000Z');
+
+    await allocate(reconciled.userId, {
+      ledger: CreditLedger.SUBSCRIPTION,
+      amount: 200,
+      idempotencyKey: 'grant-7',
+      replacing: false,
+      stripeInvoiceId: 'in_test_1',
+      periodStart,
+    });
+
+    expect(await rowsOf(reconciled.walletId)).toMatchObject([
+      { stripeInvoiceId: 'in_test_1', periodStart, idempotencyKey: 'grant-7' },
+    ]);
+
+    const granted = await allocate(bare.userId, {
+      ledger: CreditLedger.SUBSCRIPTION,
+      amount: 200,
+      idempotencyKey: 'grant-8',
+      replacing: false,
+    });
+
+    expect(granted.balance).toEqual({ subscription: 200, addon: 0 });
+    expect(await rowsOf(bare.walletId)).toMatchObject([
+      { stripeInvoiceId: null, periodStart: null },
+    ]);
+  });
+
+  it('lands a replacing grant on the plan amount and forfeits the remainder', async () => {
+    const { userId, walletId } = await aWallet(30, 40);
+
+    const renewed = await allocate(userId, {
+      ledger: CreditLedger.SUBSCRIPTION,
+      amount: 200,
+      idempotencyKey: 'renewal-1',
+      replacing: true,
+    });
+
+    expect(renewed.balance).toEqual({ subscription: 200, addon: 40 });
+    expect(await balanceOf(walletId)).toMatchObject({
+      subscriptionCredits: 200,
+      addonCredits: 40,
+    });
+    expect(await byType(walletId)).toEqual({
+      RESET: [-30, 0, null],
+      ALLOCATION: [200, 200, 'renewal-1'],
+    });
+    expect((await rowsOf(walletId)).every((row) => row.ledger === 'SUBSCRIPTION')).toBe(true);
+  });
+
+  it('does not zero a balance twice when a replacing grant is retried', async () => {
+    const { userId, walletId } = await aWallet(30, 0);
+    const request: AllocateRequest = {
+      ledger: CreditLedger.SUBSCRIPTION,
+      amount: 200,
+      idempotencyKey: 'renewal-2',
+      replacing: true,
+    };
+
+    const first = await allocate(userId, request);
+    const second = await allocate(userId, request);
+
+    expect(second).toEqual(first);
+    expect(await balanceOf(walletId)).toMatchObject({ subscriptionCredits: 200 });
+
+    expect(await rowsOf(walletId)).toHaveLength(2);
+    expect(await byType(walletId)).toEqual({
+      RESET: [-30, 0, null],
+      ALLOCATION: [200, 200, 'renewal-2'],
+    });
+  });
+
+  it('adds a non-replacing grant, and refuses to replace the add-on ledger', async () => {
+    const midCycle = await aWallet(30, 0);
+    const bought = await aWallet(0, 50);
+
+    const upgraded = await allocate(midCycle.userId, {
+      ledger: CreditLedger.SUBSCRIPTION,
+      amount: 200,
+      idempotencyKey: 'upgrade-1',
+      replacing: false,
+    });
+
+    expect(upgraded.balance).toEqual({ subscription: 230, addon: 0 });
+    expect(await rowsOf(midCycle.walletId)).toMatchObject([{ type: 'ALLOCATION', amount: 200 }]);
+
+    await expect(
+      allocate(bought.userId, {
+        ledger: CreditLedger.ADDON,
+        amount: 100,
+        idempotencyKey: 'upgrade-2',
+        replacing: true,
+      }),
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+
+    expect(await rowsOf(bought.walletId)).toEqual([]);
+    expect(await balanceOf(bought.walletId)).toMatchObject({ addonCredits: 50 });
+  });
+
+  it('forfeits what the subscription ledger holds and leaves add-on standing', async () => {
+    const { userId, walletId } = await aWallet(120, 50);
+
+    const balance = await prisma.$transaction((tx) => credit.reset(tx, userId));
+
+    expect(balance).toEqual({ subscription: 0, addon: 50 });
+    expect(await balanceOf(walletId)).toMatchObject({
+      subscriptionCredits: 0,
+      addonCredits: 50,
+    });
+    expect(await rowsOf(walletId)).toMatchObject([
+      {
+        ledger: 'SUBSCRIPTION',
+        type: 'RESET',
+        amount: -120,
+        balanceAfter: 0,
+        idempotencyKey: null,
+      },
+    ]);
+  });
+
+  it('writes no row when there is nothing left to forfeit', async () => {
+    const { userId, walletId } = await aWallet(0, 50);
+
+    const balance = await prisma.$transaction((tx) => credit.reset(tx, userId));
+
+    expect(balance).toEqual({ subscription: 0, addon: 50 });
+    expect(await rowsOf(walletId)).toEqual([]);
+    expect(await balanceOf(walletId)).toMatchObject({ addonCredits: 50 });
+  });
+
+  it('takes nothing and records nothing when a wallet is frozen', async () => {
+    const { userId, walletId } = await aWallet(0, 50);
+
+    await freeze(userId);
+
+    expect(await balanceOf(walletId)).toMatchObject({
+      status: WalletStatus.FROZEN,
+      subscriptionCredits: 0,
+      addonCredits: 50,
+    });
+    expect(await rowsOf(walletId)).toEqual([]);
+  });
+
+  it('refuses a draw the add-on ledger could satisfy, and allows it again once unfrozen', async () => {
+    const { userId, walletId } = await aWallet(0, 50);
+
+    await freeze(userId);
+
+    expect(await credit.consume(userId, { amount: 10, idempotencyKey: 'job-24' })).toEqual({
+      success: false,
+      reason: DECLINE_REASONS.billingFrozen,
+      balance: { subscription: 0, addon: 50 },
+    });
+
+    await unfreeze(userId);
+
+    expect(await balanceOf(walletId)).toMatchObject({
+      status: WalletStatus.ACTIVE,
+      addonCredits: 50,
+    });
+    expect(await credit.consume(userId, { amount: 10, idempotencyKey: 'job-25' })).toMatchObject({
+      success: true,
+      balance: { subscription: 0, addon: 40 },
+    });
+  });
+
+  it('changes nothing when a frozen wallet is frozen or an active one unfrozen', async () => {
+    const frozen = await aWallet(20, 50, WalletStatus.FROZEN);
+    const active = await aWallet(20, 50);
+
+    await freeze(frozen.userId);
+    await unfreeze(active.userId);
+
+    expect(await balanceOf(frozen.walletId)).toMatchObject({
+      status: WalletStatus.FROZEN,
+      subscriptionCredits: 20,
+      addonCredits: 50,
+    });
+    expect(await balanceOf(active.walletId)).toMatchObject({
+      status: WalletStatus.ACTIVE,
+      subscriptionCredits: 20,
+      addonCredits: 50,
+    });
+    expect(await rowsOf(frozen.walletId)).toEqual([]);
+    expect(await rowsOf(active.walletId)).toEqual([]);
+  });
+
+  it('lets a frozen wallet be allocated to, adjusted, and reset', async () => {
+    const { userId, walletId } = await aWallet(30, 50, WalletStatus.FROZEN);
+
+    const granted = await allocate(userId, {
+      ledger: CreditLedger.SUBSCRIPTION,
+      amount: 200,
+      idempotencyKey: 'renewal-3',
+      replacing: true,
+    });
+    expect(granted.balance).toEqual({ subscription: 200, addon: 50 });
+
+    expect(await credit.adjust(userId, 25, 'goodwill')).toEqual({
+      subscription: 200,
+      addon: 75,
+    });
+
+    expect(await prisma.$transaction((tx) => credit.reset(tx, userId))).toEqual({
+      subscription: 0,
+      addon: 75,
+    });
+
+    expect(await balanceOf(walletId)).toMatchObject({
+      status: WalletStatus.FROZEN,
+      subscriptionCredits: 0,
+      addonCredits: 75,
+    });
+  });
+
+  it('credits and debits the add-on ledger alone, carrying the admin reason', async () => {
+    const credited = await aWallet(80, 0);
+    const debited = await aWallet(80, 100);
+
+    expect(await credit.adjust(credited.userId, 100, 'support goodwill')).toEqual({
+      subscription: 80,
+      addon: 100,
+    });
+    expect(await rowsOf(credited.walletId)).toMatchObject([
+      {
+        ledger: 'ADDON',
+        type: 'ADJUSTMENT',
+        amount: 100,
+        balanceAfter: 100,
+        reason: 'support goodwill',
+        idempotencyKey: null,
+      },
+    ]);
+
+    expect(await credit.adjust(debited.userId, -40, 'duplicate purchase')).toEqual({
+      subscription: 80,
+      addon: 60,
+    });
+    expect(await balanceOf(debited.walletId)).toMatchObject({
+      subscriptionCredits: 80,
+      addonCredits: 60,
+    });
+  });
+
+  it('refuses a debit larger than the add-on ledger and allows one down to zero', async () => {
+    const tooLarge = await aWallet(80, 30);
+    const exact = await aWallet(80, 30);
+
+    await expect(credit.adjust(tooLarge.userId, -50, 'clawback')).rejects.toBeInstanceOf(
+      AdjustmentExceedsBalanceError,
+    );
+    expect(await rowsOf(tooLarge.walletId)).toEqual([]);
+    expect(await balanceOf(tooLarge.walletId)).toMatchObject({
+      subscriptionCredits: 80,
+      addonCredits: 30,
+    });
+
+    expect(await credit.adjust(exact.userId, -30, 'clawback')).toEqual({
+      subscription: 80,
+      addon: 0,
+    });
+    expect(await rowsOf(exact.walletId)).toMatchObject([
+      { ledger: 'ADDON', type: 'ADJUSTMENT', amount: -30, balanceAfter: 0 },
+    ]);
+  });
+
+  it('leaves the subscription ledger unreachable by any adjustment', async () => {
+    const { userId, walletId } = await aWallet(80, 30);
+
+    await credit.adjust(userId, 100, 'goodwill');
+    await credit.adjust(userId, -40, 'clawback');
+    await expect(credit.adjust(userId, -500, 'clawback')).rejects.toBeInstanceOf(
+      AdjustmentExceedsBalanceError,
+    );
+
+    expect(await balanceOf(walletId)).toMatchObject({ subscriptionCredits: 80, addonCredits: 90 });
+    expect((await rowsOf(walletId)).every((row) => row.ledger === CreditLedger.ADDON)).toBe(true);
   });
 });

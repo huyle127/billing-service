@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import { Role, WalletStatus } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { seedAdmin } from '../prisma/seed-admin';
 import { AuthModule } from '../src/auth/auth.module';
 import { TOKEN_TYPES } from '../src/auth/auth.constants';
 import { AppConfigModule } from '../src/common/config/config.module';
@@ -78,6 +79,23 @@ describe('credit consumption over HTTP', () => {
     });
 
     return { accessToken, userId: user.id, walletId: wallet.id };
+  }
+
+  async function anAdminToken(): Promise<string> {
+    await seedAdmin(prisma);
+    const login = await post('/auth/login', {
+      email: process.env.ADMIN_EMAIL,
+      password: process.env.ADMIN_PASSWORD,
+    });
+
+    return ((await login.json()) as { accessToken: string }).accessToken;
+  }
+
+  async function aCallerWithoutAWallet(): Promise<string> {
+    const email = `${crypto.randomUUID()}@example.test`;
+    await post('/auth/register', { email, password: PASSWORD });
+
+    return (await prisma.user.findUniqueOrThrow({ where: { email } })).id;
   }
 
   it('consumes, replays, and reverses across both ledgers', async () => {
@@ -233,5 +251,81 @@ describe('credit consumption over HTTP', () => {
       expect(response.status).toBe(400);
       expect(await response.json()).toMatchObject({ error: { code: 'VALIDATION_FAILED' } });
     }
+  });
+
+  it('adjusts the wallet named in the path for an admin, and nobody else', async () => {
+    const subject = await aFundedCaller();
+    const admin = await anAdminToken();
+
+    const adjusted = await post(
+      `/admin/users/${subject.userId}/credits/adjust`,
+      { amount: 25, reason: 'support goodwill' },
+      admin,
+    );
+
+    expect(adjusted.status).toBe(200);
+    expect(await adjusted.json()).toEqual({ subscription: 100, addon: 75 });
+    expect(
+      await prisma.creditWallet.findUniqueOrThrow({ where: { id: subject.walletId } }),
+    ).toMatchObject({ subscriptionCredits: 100, addonCredits: 75 });
+
+    const asUser = await post(
+      `/admin/users/${subject.userId}/credits/adjust`,
+      { amount: 25, reason: 'self service' },
+      subject.accessToken,
+    );
+
+    expect(asUser.status).toBe(403);
+    expect(await asUser.json()).toMatchObject({ error: { code: 'FORBIDDEN' } });
+
+    const anonymous = await post(`/admin/users/${subject.userId}/credits/adjust`, {
+      amount: 25,
+      reason: 'no token',
+    });
+
+    expect(anonymous.status).toBe(401);
+    expect(await anonymous.json()).toMatchObject({ error: { code: 'UNAUTHORIZED' } });
+
+    expect(
+      await prisma.creditWallet.findUniqueOrThrow({ where: { id: subject.walletId } }),
+    ).toMatchObject({ addonCredits: 75 });
+
+    const walletless = await post(
+      `/admin/users/${await aCallerWithoutAWallet()}/credits/adjust`,
+      { amount: 25, reason: 'no wallet' },
+      admin,
+    );
+
+    expect(walletless.status).toBe(404);
+    expect(await walletless.json()).toMatchObject({ error: { code: 'NOT_FOUND' } });
+  });
+
+  it('refuses a malformed adjustment, a named ledger, and a debit the wallet cannot cover', async () => {
+    const subject = await aFundedCaller();
+    const admin = await anAdminToken();
+    const path = `/admin/users/${subject.userId}/credits/adjust`;
+
+    for (const body of [
+      { amount: 0, reason: 'nothing' },
+      { amount: 1.5, reason: 'a fraction' },
+      { amount: 25, reason: 'a ledger', ledger: 'SUBSCRIPTION' },
+      { amount: 25 },
+      { amount: 25, reason: '' },
+    ]) {
+      const response = await post(path, body, admin);
+
+      expect({ body, status: response.status }).toEqual({ body, status: 400 });
+      expect(await response.json()).toMatchObject({ error: { code: 'VALIDATION_FAILED' } });
+    }
+
+    const overLarge = await post(path, { amount: -80, reason: 'clawback' }, admin);
+
+    expect(overLarge.status).toBe(400);
+    expect(await overLarge.json()).toMatchObject({
+      error: { code: 'ADJUSTMENT_EXCEEDS_BALANCE' },
+    });
+    expect(
+      await prisma.creditWallet.findUniqueOrThrow({ where: { id: subject.walletId } }),
+    ).toMatchObject({ subscriptionCredits: 100, addonCredits: 50 });
   });
 });

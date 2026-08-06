@@ -10,6 +10,8 @@ export interface NewLedgerRow {
   reason?: string;
   idempotencyKey?: string;
   reversesId?: string;
+  stripeInvoiceId?: string;
+  periodStart?: Date;
 }
 
 @Injectable()
@@ -25,6 +27,17 @@ export class CreditTransactionRepository {
   ): Promise<CreditTransaction[]> {
     return tx.creditTransaction.findMany({
       where: { walletId, idempotencyKey, type: CreditTransactionType.CONSUMPTION },
+    });
+  }
+
+  findAllocation(
+    tx: Prisma.TransactionClient,
+    walletId: string,
+    idempotencyKey: string,
+    ledger: CreditLedger,
+  ): Promise<CreditTransaction | null> {
+    return tx.creditTransaction.findFirst({
+      where: { walletId, idempotencyKey, ledger, type: CreditTransactionType.ALLOCATION },
     });
   }
 

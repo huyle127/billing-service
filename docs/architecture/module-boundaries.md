@@ -223,6 +223,16 @@ acyclic:
 A route that must skip authentication says so with `@Public()`. Forgetting it breaks that route
 loudly, where forgetting `@UseGuards` would have left one open silently.
 
+**Role enforcement follows the same two rules.** `RolesGuard` is a second `APP_GUARD` in
+`auth.module.ts`, and its marker `@Roles()` is published by `common/identity/` beside `@Public()`.
+So a leaf module owns an admin route without an edge back to `auth`:
+`POST /v1/admin/users/:userId/credits/adjust` lives in `credit`, marks itself `@Roles(Role.ADMIN)`,
+and `credit-seam.spec.ts` still passes. Putting the route in an admin module outside `credit` was
+rejected — it separates a controller from the only service it calls.
+
+The guard returns `true` when a route marks no role, so registering it globally closes nothing that
+was previously open. An unmarked route stays reachable by any authenticated caller.
+
 **The Stripe seam.** `billing/stripe/` is the only place Stripe SDK types appear. Everything above it
 sees domain types. This is a real seam with a second adapter — the test fake — not a hypothetical
 one.
