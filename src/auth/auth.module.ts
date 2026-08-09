@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
+import { BillingModule } from '../billing/billing.module';
 import { AppConfigService } from '../common/config/app-config.service';
 import { RolesGuard } from '../common/identity/roles.guard';
 import { UserModule } from '../user/user.module';
@@ -13,6 +14,7 @@ const ALGORITHM = 'HS256';
 @Module({
   imports: [
     UserModule,
+    BillingModule,
     JwtModule.registerAsync({
       inject: [AppConfigService],
       useFactory: (config: AppConfigService) => ({

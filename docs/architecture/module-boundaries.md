@@ -11,6 +11,8 @@ src/
   auth/              credentials, token issuance and verification
   user/              user identity
   billing/           subscriptions, payments, plans, Stripe
+    services/        entitlement, provisioning, and the schedules that drive them
+    repositories/    Plan, BillingCustomer, Subscription
     stripe/          StripeService — the only place Stripe SDK types are visible
     webhook/         controller, WebhookEvent repository, queue worker, handlers
   credit/            wallet, two ledgers, credit transactions
@@ -49,6 +51,13 @@ to put in it:
 `controllers/` and `services/` are not optional layers to be collapsed when a module is small. A
 controller holding business logic is the failure this prevents, and it does not become acceptable
 because there is only one route.
+
+**A scheduler is a service under `services/`, not a role of its own.** There is no `schedulers/`
+directory: `provisioning-scheduler.service.ts` sits beside `provisioning.service.ts` and registers
+an interval that calls it. It is a separate *file* rather than an `OnModuleInit` on the service it
+drives, so that *what the sweep does* and *when it runs* are not the same class — the sweep is
+reached identically by the schedule, by registration, and by any later caller. A directory would
+file one file per module under a role that says nothing the `-scheduler` in the name does not.
 
 **`repositories/` is conditional.** A module gets one when it has enough query surface for the
 separation to buy something: several aggregates, queries built from varying criteria, or raw SQL

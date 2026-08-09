@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
+import { BillingModule } from './billing/billing.module';
 import { StripeModule } from './billing/stripe/stripe.module';
 import { ClockModule } from './common/clock/clock.module';
 import { AppConfigModule } from './common/config/config.module';
@@ -22,6 +23,7 @@ import { UserModule } from './user/user.module';
     StripeModule,
     UserModule,
     AuthModule,
+    BillingModule,
     CreditModule,
   ],
 })

@@ -11,9 +11,9 @@ Status: `covered` · `partial` · `todo`
 | --- | --- | --- |
 | A user has exactly one current subscription | `ledger-invariants: at most one current subscription` | covered |
 | A subscription awaiting authentication is not current | `ledger-invariants: pending coexists with current` | covered |
-| Registration grants plan and credits without contacting Stripe | | todo |
-| Stripe customer and subscription provisioned immediately after registration | | todo |
-| A subscription with no Stripe id is a valid intermediate state | | todo |
+| Registration grants plan and credits without contacting Stripe | `entitlement.service: writes the customer, the Free subscription, the wallet and the grant, with no Stripe id` · `auth.service: registers while every Stripe operation fails, leaving both identifiers null` · `auth-http: hands back a user already holding a plan and a balance` | covered |
+| Stripe customer and subscription provisioned immediately after registration | `provisioning.service: attaches both identifiers and leaves no sync state behind` · `provisioning.service: creates nothing a second time when it runs again` · `provisioning.service: adopts an object Stripe already holds once the idempotency key has expired` | covered |
+| A subscription with no Stripe id is a valid intermediate state | `auth-http: spends the registration grant straight away, and writes nothing for a repeated email` · `provisioning.service: sweeps everything outstanding and leaves a row not yet due alone` · `provisioning.service: never picks up an expired subscription, because history is not a backlog` | covered |
 | Expired Pro subscription spawns a new Free subscription | | todo |
 | Subscription credits are forfeited when a subscription expires | | todo |
 | Cron allocates monthly for annual subscriptions | | todo |
@@ -85,12 +85,16 @@ Status: `covered` · `partial` · `todo`
 | Refresh token hash stored; logout revokes | `auth.service: stores the hash of the refresh token it hands out, not the token` · `auth.service: clears the stored hash on logout` | covered |
 | User endpoints reject an absent or invalid token | `auth-http: rejects every shape of unusable access token with 401` | covered |
 | Admin endpoints reject a user token | `auth-http: lets an admin token through and turns a user token away` | covered |
-| Internal key yields a service principal with no user identity | | todo — ticket 023 |
-| Internal endpoints reject "act on behalf of" semantics | | todo — ticket 023 |
+| Internal key yields a service principal with no user identity | | todo — ticket 028 |
+| Internal endpoints reject "act on behalf of" semantics | | todo — ticket 028 |
 
-The last two are deferred deliberately. The internal API key has no endpoint to guard until ticket
-023 ships `POST /v1/internal/provisioning/run`; building the guard earlier would mean asserting it
-against a probe controller that exists only in a test.
+The last two are deferred deliberately, and the deferral moved from ticket 023 to ticket 028. Ticket
+023 was going to ship `POST /v1/internal/provisioning/run`; it shipped an in-process schedule for the
+provisioning sweep instead, which left that endpoint with no caller of its own. The rule that decides
+this is ticket 020's own — build an operation when a caller exists — and it is why 020 refused to
+assert the guard against a probe controller living in a test. Ticket 028 carries
+`POST /v1/internal/allocations/run` and now carries the provisioning route too, so one guard gets
+built once against two real callers rather than once against none.
 
 ## Section 10 — Non-functional
 

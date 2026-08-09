@@ -68,4 +68,20 @@ export class AppConfigService {
   get webhookRetryBackoffMs(): number {
     return this.config.getOrThrow<number>('webhook.retryBackoffMs');
   }
+
+  get provisioningSweepIntervalMs(): number {
+    return this.config.getOrThrow<number>('provisioning.sweepIntervalMs');
+  }
+
+  get provisioningBatchSize(): number {
+    return this.config.getOrThrow<number>('provisioning.batchSize');
+  }
+
+  get provisioningRetryBackoffMs(): number {
+    return this.config.getOrThrow<number>('provisioning.retryBackoffMs');
+  }
+
+  get provisioningStaleAfterMs(): number {
+    return this.config.getOrThrow<number>('provisioning.staleAfterMs');
+  }
 }

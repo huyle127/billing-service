@@ -3,6 +3,9 @@ import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { Prisma, User } from '@prisma/client';
 import { compare, hash } from 'bcrypt';
 import { createHash, randomUUID } from 'node:crypto';
+import { REGISTRATION_TRANSACTION } from '../../billing/billing.constants';
+import { EntitlementService } from '../../billing/services/entitlement.service';
+import { ProvisioningService } from '../../billing/services/provisioning.service';
 import { AppConfigService } from '../../common/config/app-config.service';
 import { ValidationError } from '../../common/errors/domain.exception';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -31,18 +34,28 @@ export class AuthService {
     private readonly users: UserService,
     private readonly jwt: JwtService,
     private readonly config: AppConfigService,
+    private readonly entitlement: EntitlementService,
+    private readonly provisioning: ProvisioningService,
   ) {}
 
   async register(email: string, password: string): Promise<User> {
     const passwordHash = await hash(password, this.config.bcryptSaltRounds);
+    const user = await this.createWithEntitlement(email, passwordHash);
 
+    void this.provisioning.provision(user.id).catch(() => undefined);
+
+    return user;
+  }
+
+  private async createWithEntitlement(email: string, passwordHash: string): Promise<User> {
     try {
       return await this.prisma.$transaction(async (tx) => {
         const user = await this.users.createInTransaction(tx, { email });
         await tx.authCredential.create({ data: { userId: user.id, passwordHash } });
+        await this.entitlement.grantOnRegistration(tx, user);
 
         return user;
-      });
+      }, REGISTRATION_TRANSACTION);
     } catch (error) {
       if (isDuplicateEmail(error)) {
         throw new ValidationError('Email is already registered', { email });

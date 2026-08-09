@@ -229,6 +229,12 @@ accept "act on behalf of user X" semantics.
 Both are idempotent and invoke the same routines the in-process scheduler calls. Running them
 concurrently with the scheduler is harmless.
 
+**Neither route exists yet. Both arrive with ticket 028**, together with `InternalKeyGuard` and the
+service principal. Ticket 023 shipped the provisioning sweep as an in-process schedule, which left
+`/v1/internal/provisioning/run` with no caller of its own — and ticket 020 settled the rule that
+decides this: build an operation when a caller exists. Ticket 028 brings the second route, so the
+guard is built once against two real callers rather than once against none.
+
 ## Webhook endpoint
 
 ```

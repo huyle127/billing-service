@@ -60,10 +60,18 @@ export const webhookConfig = registerAs('webhook', () => ({
   retryBackoffMs: integer('WEBHOOK_RETRY_BACKOFF_MS', 60000),
 }));
 
+export const provisioningConfig = registerAs('provisioning', () => ({
+  sweepIntervalMs: integer('PROVISIONING_SWEEP_INTERVAL_MS', 60000),
+  batchSize: integer('PROVISIONING_BATCH_SIZE', 50),
+  retryBackoffMs: integer('PROVISIONING_RETRY_BACKOFF_MS', 60000),
+  staleAfterMs: integer('PROVISIONING_STALE_AFTER_MS', 3600000),
+}));
+
 export const configurations = [
   appConfig,
   databaseConfig,
   authConfig,
   stripeConfig,
   webhookConfig,
+  provisioningConfig,
 ];

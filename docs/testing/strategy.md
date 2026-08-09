@@ -12,6 +12,33 @@ across missed months. The checklist in [requirement-coverage.md](requirement-cov
 answers "what is still missing"; coverage output is a secondary signal for finding code nothing
 touches.
 
+## How much to test
+
+**At most ten new tests per OpenSpec change.** Exceeding the ceiling is allowed, but the reason
+must be stated in that change's proposal, so the overrun is a decision rather than a drift.
+
+The ceiling exists because the completion criterion above is easy to over-serve. A clause is
+covered when *one named test* asserts it; writing four tests around the same clause buys nothing
+and costs on every future change that has to keep them passing. Ticket 023 added 24 tests to close
+three clauses, and the extra tests were not the ones that found the two real bugs.
+
+**Test what can break silently:**
+
+- Rules enforced by the database — constraints, partial indexes, unique columns. Asserted by
+  attempting the violation, never by trusting the code path.
+- Concurrency. Two callers racing the same row, asserted on the outcome rather than on timing.
+- Money and credits. Balances, arithmetic, and the boundaries where a draw splits across ledgers.
+- Idempotency. The second call under the same key writes nothing.
+- Transaction rollback. The whole unit lands, or none of it does.
+
+**Do not test:** every field of a row that was just created, DI and module wiring, the text of a
+log line, exact backoff numbers, or a happy path already covered by another test asserting the
+same behaviour. These fail loudly the moment they are wrong — the compiler, the boot sequence, or
+the next test catches them — so a test is a second copy of an assertion already being made.
+
+The distinction is whether a wrong answer is *visible*. A missing credit is not; a missing
+provider is.
+
 ## Runner
 
 **Vitest**, with `unplugin-swc`.

@@ -82,6 +82,59 @@ describe('the credit ledger', () => {
     );
   }
 
+  function aUser() {
+    return prisma.user.create({ data: { email: `${crypto.randomUUID()}@example.test` } });
+  }
+
+  it('opens a wallet empty and active inside the caller transaction, and none when it fails', async () => {
+    const opened = await aUser();
+
+    await prisma.$transaction((tx) => credit.createWallet(tx, opened.id));
+
+    expect(
+      await prisma.creditWallet.findUniqueOrThrow({ where: { userId: opened.id } }),
+    ).toMatchObject({
+      status: WalletStatus.ACTIVE,
+      subscriptionCredits: 0,
+      addonCredits: 0,
+    });
+
+    const abandoned = await aUser();
+
+    await expect(
+      prisma.$transaction(async (tx) => {
+        await credit.createWallet(tx, abandoned.id);
+
+        throw new Error('the caller failed after opening a wallet');
+      }),
+    ).rejects.toThrow('the caller failed after opening a wallet');
+
+    expect(await prisma.creditWallet.findUnique({ where: { userId: abandoned.id } })).toBeNull();
+  });
+
+  it('allocates to a wallet opened in the same transaction', async () => {
+    const user = await aUser();
+
+    const granted = await prisma.$transaction(async (tx) => {
+      await credit.createWallet(tx, user.id);
+
+      return credit.allocate(tx, user.id, {
+        ledger: CreditLedger.SUBSCRIPTION,
+        amount: 50,
+        idempotencyKey: 'grant-on-open',
+        replacing: false,
+      });
+    });
+
+    expect(granted.balance).toEqual({ subscription: 50, addon: 0 });
+
+    const wallet = await prisma.creditWallet.findUniqueOrThrow({ where: { userId: user.id } });
+    expect(wallet.subscriptionCredits).toBe(50);
+    expect(await rowsOf(wallet.id)).toMatchObject([
+      { ledger: 'SUBSCRIPTION', type: 'ALLOCATION', amount: 50, balanceAfter: 50 },
+    ]);
+  });
+
   it('deducts the whole amount and records the row it wrote', async () => {
     const { userId, walletId } = await aWallet(100, 0);
 

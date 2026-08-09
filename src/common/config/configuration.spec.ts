@@ -2,7 +2,7 @@ import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppConfigService } from './app-config.service';
-import { configurations, stripeConfig } from './configuration';
+import { configurations, provisioningConfig, stripeConfig } from './configuration';
 
 describe('configuration', () => {
   let original: NodeJS.ProcessEnv;
@@ -29,6 +29,20 @@ describe('configuration', () => {
         imports: [ConfigModule.forRoot({ isGlobal: true, load: configurations })],
       }).compile(),
     ).rejects.toThrowError('WEBHOOK_BATCH_SIZE must be a non-negative integer');
+  });
+
+  it('refuses a negative value rather than reading it as a disabled feature', () => {
+    process.env.PROVISIONING_BATCH_SIZE = '-1';
+
+    expect(() => provisioningConfig()).toThrowError(
+      'PROVISIONING_BATCH_SIZE must be a non-negative integer',
+    );
+  });
+
+  it('takes a zero sweep interval as itself, not as an absent value falling back to the default', () => {
+    process.env.PROVISIONING_SWEEP_INTERVAL_MS = '0';
+
+    expect(provisioningConfig().sweepIntervalMs).toBe(0);
   });
 
   it('reads more than one webhook signing secret', () => {

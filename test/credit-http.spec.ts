@@ -7,6 +7,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { seedAdmin } from '../prisma/seed-admin';
 import { AuthModule } from '../src/auth/auth.module';
 import { TOKEN_TYPES } from '../src/auth/auth.constants';
+import { FakeStripeAdapter } from '../src/billing/stripe/adapters/fake-stripe.adapter';
+import { StripeService } from '../src/billing/stripe/interfaces/stripe-adapter.interface';
+import { Clock } from '../src/common/clock/clock';
 import { AppConfigModule } from '../src/common/config/config.module';
 import { configurations } from '../src/common/config/configuration';
 import { DomainExceptionFilter } from '../src/common/errors/domain-exception.filter';
@@ -33,7 +36,10 @@ describe('credit consumption over HTTP', () => {
         AuthModule,
         CreditModule,
       ],
-    }).compile();
+    })
+      .overrideProvider(StripeService)
+      .useFactory({ factory: (clock: Clock) => new FakeStripeAdapter(clock), inject: [Clock] })
+      .compile();
 
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('v1');
@@ -74,9 +80,11 @@ describe('credit consumption over HTTP', () => {
     const { accessToken } = (await login.json()) as { accessToken: string };
 
     const user = await prisma.user.findUniqueOrThrow({ where: { email } });
-    const wallet = await prisma.creditWallet.create({
-      data: { userId: user.id, subscriptionCredits, addonCredits, status },
+    const wallet = await prisma.creditWallet.update({
+      where: { userId: user.id },
+      data: { subscriptionCredits, addonCredits, status },
     });
+    await prisma.creditTransaction.deleteMany({ where: { walletId: wallet.id } });
 
     return { accessToken, userId: user.id, walletId: wallet.id };
   }
@@ -94,8 +102,11 @@ describe('credit consumption over HTTP', () => {
   async function aCallerWithoutAWallet(): Promise<string> {
     const email = `${crypto.randomUUID()}@example.test`;
     await post('/auth/register', { email, password: PASSWORD });
+    const user = await prisma.user.findUniqueOrThrow({ where: { email } });
 
-    return (await prisma.user.findUniqueOrThrow({ where: { email } })).id;
+    await prisma.creditWallet.delete({ where: { userId: user.id } });
+
+    return user.id;
   }
 
   it('consumes, replays, and reverses across both ledgers', async () => {

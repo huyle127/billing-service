@@ -96,24 +96,53 @@ context: |
   if/else, keep functions small. Reuse existing code before creating new abstractions. Do not
   refactor unrelated code. Single quotes, Prettier defaults.
 
+  SCOPE DISCIPLINE. This is a learning project with roughly a dozen build tickets left, and
+  planning volume is the thing that has been running away with them: ticket 023 produced ~890
+  lines of artifact and 24 tests for ~600 lines of code. Artifacts carry hard line ceilings —
+  see the per-artifact rules below — and every change carries a budget of at most 10 new tests.
+  Both are ceilings, not targets. Build only what has a caller in this change; machinery a later
+  ticket will need stays in the design and out of the source tree. Test only what can break
+  silently — database constraints, concurrency, money, idempotency, transaction rollback — and
+  do not test field mapping, DI wiring, or log text. Prose is subject to the same discipline as
+  code: say a thing once, in the one place that owns it, and link to it from everywhere else.
+
 rules:
   proposal:
+    - ASK BEFORE WRITING. Before generating any artifact, ask 2-4 grouped questions about the
+      business rules this ticket leaves ambiguous, and wait for the answer. Ask only about rules
+      whose answer changes what gets built — never about layout, naming, or anything the
+      architecture docs already fix. If nothing is genuinely ambiguous, say so in one line and
+      carry on.
+    - Ceiling 40 lines. Why, What Changes, and the clauses this closes. Nothing else.
     - State which wayfinder ticket this change implements, by name and number.
     - Name the requirement clauses from docs/testing/requirement-coverage.md that this change
       moves off `todo`, quoting them verbatim so they can be matched mechanically.
+    - Declare the test budget: how many new tests this change adds. The ceiling is 10, and
+      exceeding it requires the reason stated here. See docs/testing/strategy.md.
   design:
+    - Optional, and 80 lines when it exists. Write it only for a decision THIS change is the
+      first to make. A change that merely applies decisions already closed has no design file.
+    - One paragraph per decision: what was chosen, and the one reason it beat the alternative.
+      Do not narrate rejected options nobody proposed, and do not restate what a ticket, an ADR
+      or an architecture doc already says — link it.
     - Do not re-litigate decisions already closed on the wayfinder map. Link the ticket that
       closed them and move on.
     - Call out explicitly any schema change needed, and state that it ships as a migration
       generated with `migrate diff` and applied with `migrate deploy`.
   tasks:
+    - Ceiling 15 lines. One line per task, imperative, naming the file it touches. A task whose
+      description needs a second line is either two tasks or reasoning that belongs in design.
+    - Do not write a task per test. Tests ship inside the task that implements the behaviour.
     - Order tasks so tests come first for credit ledger and subscription lifecycle rules, and
       after implementation for controllers, Prisma wiring, and configuration.
     - The last task of every change updates docs/testing/requirement-coverage.md, moving each
       claimed clause from `todo` to `covered` with the name of the test that asserts it.
   specs:
+    - Ceiling 80 lines across all spec files in the change. One scenario per rule.
     - Write scenarios as behaviour observable from outside the module, so a named test can
       assert them directly.
+    - A scenario carries WHEN/THEN and nothing else. Reasoning lives in the ticket, not in an
+      explanatory paragraph underneath the scenario.
     - Where a rule is enforced by a database constraint rather than application logic, say so
       in the scenario — those are asserted by attempting the violation, not by trusting the
       code path.

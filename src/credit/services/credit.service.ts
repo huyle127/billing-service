@@ -148,6 +148,10 @@ export class CreditService {
     );
   }
 
+  async createWallet(tx: Prisma.TransactionClient, userId: string): Promise<void> {
+    await this.wallets.create(tx, userId);
+  }
+
   async allocate(
     tx: Prisma.TransactionClient,
     userId: string,

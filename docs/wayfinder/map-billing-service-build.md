@@ -67,6 +67,19 @@ part that holds real risk rather than a "written test-first" subsection per sect
 thing. Amended 2026-08-06, replacing a blanket `/tdd` for the credit ledger and subscription
 lifecycle.
 
+**Amended 2026-08-09, with numbers, because the prose version did not hold.** Ticket 023 shipped
+~890 lines of artifact and 24 tests for ~600 lines of code three days after the paragraph above was
+written. Ceilings now bind at generation time in the `rules` block of `openspec/config.yaml`:
+**proposal 40 lines, design 80 and optional, specs 80, tasks 15, and at most 10 new tests per
+change** — the last also recorded in [`strategy.md`](../testing/strategy.md) under "How much to
+test". A design file is written only for a decision its own change is the first to make; one that
+merely applies settled decisions has none. Exceeding the test budget is allowed and must be argued
+in the proposal.
+
+**Ambiguity is asked about, not inferred.** `/opsx:propose` opens with 2-4 grouped questions on the
+business rules the ticket leaves open, and waits — only where the answer changes what gets built,
+never about layout or naming, which are already fixed here and in `module-boundaries.md`.
+
 **Rules from `AGENTS.md`** that every session must honour: business logic stays out of
 controllers; Stripe is an infrastructure adapter; state-changing operations use transactions;
 no comments unless requested; prefer early return; code in English, explanations in Vietnamese.
@@ -275,6 +288,25 @@ covered the table has served its purpose and can retire in favour of the specs.
   identical token**, because a JWT is a pure function of payload, issued-at second, and secret —
   refresh tokens now carry a `jti`. `auth ──▶ billing` added to the graph, putting `auth` where
   deleting it breaks nothing. 23 new tests, 73 total.
+- [023 Build registration provisioning and the Stripe sync reconciler](tickets/023-build-registration-provisioning.md)
+  — shipped through OpenSpec change `build-registration-provisioning`, and the first ticket to
+  exercise `auth ──▶ billing ──▶ credit` end to end. **The sweep is claim-then-work, in two
+  transactions**: `FOR UPDATE SKIP LOCKED` holds locks for the life of its transaction and
+  provisioning calls Stripe, so one short transaction claims a batch and pushes `syncNextAttemptAt`
+  forward, commits, and the work happens with no transaction open. The claim is a **lease** — after
+  it commits, a concurrent sweep's due-by predicate no longer matches those rows, so `SKIP LOCKED`
+  covers the overlap during the claim and the lease covers it after. Backoff is therefore written
+  *before* the attempt, so a sweep that dies mid-flight leaves rows that retry rather than rows
+  nothing picks up. **Two services, not one**: `grantOnRegistration(tx, …)` must not touch the
+  network and `provision(userId)` does nothing else, and one name over both would hide that. **The
+  internal endpoint and `InternalKeyGuard` moved to ticket 028** under ticket 020's own rule — build
+  an operation when a caller exists — because the in-process schedule left
+  `/v1/internal/provisioning/run` with no caller, and 028 gives the guard two. Found by test: a
+  `Date` bound into raw SQL is serialised with the local offset and Postgres's `timestamp` parser
+  discards it, skewing the claim predicate by the process time zone — bind `toISOString()` with an
+  explicit cast. Also found: the unique `stripeCustomerId` is *not* what makes concurrent
+  provisioning safe for one user (both writers update the same row); the adapter's idempotency key
+  is. 24 new tests, 152 total.
 
 ## Not yet specified
 
@@ -336,11 +368,10 @@ Frontier (open, unblocked, unclaimed):
 - [024 Build webhook ingestion and the queue worker](tickets/024-build-webhook-ingestion-and-worker.md) — task — unblocked by 019
 - [029 Build the plan and add-on catalog with admin CRUD](tickets/029-build-plan-catalog-admin.md) — task — unblocked by 020
 - [035 Decide whether imports use the `@/` path alias](tickets/035-decide-import-path-alias.md) — task — cheapest while only twelve files exist
-- [023 Build registration provisioning and the Stripe sync reconciler](tickets/023-build-registration-provisioning.md) — task — unblocked by 022
+- [025 Build the subscription lifecycle state machine](tickets/025-build-subscription-lifecycle.md) — task — unblocked by 023 — test the transition table only
 
 Blocked:
 
-- [025 Build the subscription lifecycle state machine](tickets/025-build-subscription-lifecycle.md) — task — 023 — test the transition table only
 - [026 Build the subscription webhook handlers and the ordering guarantees](tickets/026-build-subscription-webhook-handlers.md) — task — 024, 025
 - [027 Build the invoice webhook handlers and the credit allocation triggers](tickets/027-build-invoice-handlers-and-allocation.md) — task — 022, 024, 025
 - [028 Build the annual allocation cron and the internal endpoints](tickets/028-build-annual-allocation-cron.md) — task — 027

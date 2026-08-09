@@ -8,6 +8,10 @@ import { seedAdmin } from '../prisma/seed-admin';
 import { AuthModule } from '../src/auth/auth.module';
 import { TOKEN_TYPES } from '../src/auth/auth.constants';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
+import { FREE_PLAN } from '../src/billing/billing.constants';
+import { FakeStripeAdapter } from '../src/billing/stripe/adapters/fake-stripe.adapter';
+import { StripeService } from '../src/billing/stripe/interfaces/stripe-adapter.interface';
+import { Clock } from '../src/common/clock/clock';
 import { AppConfigModule } from '../src/common/config/config.module';
 import { AppConfigService } from '../src/common/config/app-config.service';
 import { configurations } from '../src/common/config/configuration';
@@ -15,8 +19,10 @@ import { DomainExceptionFilter } from '../src/common/errors/domain-exception.fil
 import { AuthenticatedUser } from '../src/common/identity/authenticated-user';
 import { CurrentUser } from '../src/common/identity/current-user.decorator';
 import { Roles } from '../src/common/identity/roles.decorator';
+import { MetricsModule } from '../src/common/metrics/metrics.module';
 import { PrismaModule } from '../src/common/prisma/prisma.module';
 import { PrismaService } from '../src/common/prisma/prisma.service';
+import { CreditModule } from '../src/credit/credit.module';
 
 const PASSWORD = 'correct horse battery staple';
 
@@ -48,10 +54,15 @@ describe('authentication over HTTP', () => {
         ConfigModule.forRoot({ isGlobal: true, load: configurations, cache: true }),
         AppConfigModule,
         PrismaModule,
+        MetricsModule,
         AuthModule,
+        CreditModule,
       ],
       controllers: [ProbeController],
-    }).compile();
+    })
+      .overrideProvider(StripeService)
+      .useFactory({ factory: (clock: Clock) => new FakeStripeAdapter(clock), inject: [Clock] })
+      .compile();
 
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('v1');
@@ -125,15 +136,62 @@ describe('authentication over HTTP', () => {
     expect(afterLogout.status).toBe(401);
   });
 
-  it('refuses a second registration of the same email in the error envelope', async () => {
+  it('hands back a user already holding a plan and a balance', async () => {
+    const email = anEmail();
+
+    const registered = await post('/auth/register', { email, password: PASSWORD });
+
+    expect(registered.status).toBe(201);
+    expect((await registered.json()).email).toBe(email);
+
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { email },
+      include: {
+        billingCustomer: true,
+        wallet: true,
+        subscriptions: { include: { plan: true } },
+      },
+    });
+
+    expect(user.billingCustomer).not.toBeNull();
+    expect(user.subscriptions).toHaveLength(1);
+    expect(user.subscriptions[0]).toMatchObject({ status: 'ACTIVE', cycle: FREE_PLAN.cycle });
+    expect(user.subscriptions[0].plan.code).toBe(FREE_PLAN.code);
+    expect(user.wallet).toMatchObject({
+      status: 'ACTIVE',
+      subscriptionCredits: user.subscriptions[0].plan.monthlyCredits,
+      addonCredits: 0,
+    });
+  });
+
+  it('spends the registration grant straight away, and writes nothing for a repeated email', async () => {
     const email = anEmail();
     await post('/auth/register', { email, password: PASSWORD });
+    const login = await post('/auth/login', { email, password: PASSWORD });
+    const { accessToken } = (await login.json()) as { accessToken: string };
+    const plan = await prisma.plan.findFirstOrThrow({
+      where: { code: FREE_PLAN.code, cycle: FREE_PLAN.cycle },
+    });
+
+    const consumed = await post(
+      '/credits/consume',
+      { amount: 10, idempotencyKey: 'registered-1' },
+      accessToken,
+    );
+
+    expect(consumed.status).toBe(200);
+    expect(await consumed.json()).toMatchObject({
+      success: true,
+      balance: { subscription: plan.monthlyCredits - 10, addon: 0 },
+    });
 
     const second = await post('/auth/register', { email, password: PASSWORD });
 
     expect(second.status).toBe(400);
     expect((await second.json()).error.code).toBe('VALIDATION_FAILED');
     expect(await prisma.user.count({ where: { email } })).toBe(1);
+    expect(await prisma.creditWallet.count()).toBe(1);
+    expect(await prisma.subscription.count()).toBe(1);
   });
 
   it('rejects every shape of unusable access token with 401', async () => {

@@ -20,6 +20,7 @@ if (url === process.env.DATABASE_URL) {
 }
 
 process.env.DATABASE_URL = url;
+process.env.PROVISIONING_SWEEP_INTERVAL_MS = '0';
 
 export const testPrisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: url }),

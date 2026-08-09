@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, WalletStatus } from '@prisma/client';
+import { CreditWallet, Prisma, WalletStatus } from '@prisma/client';
 import { LedgerBalances } from '../services/draw-split';
 
 export interface LockedWallet {
@@ -11,6 +11,10 @@ export interface LockedWallet {
 
 @Injectable()
 export class CreditWalletRepository {
+  create(tx: Prisma.TransactionClient, userId: string): Promise<CreditWallet> {
+    return tx.creditWallet.create({ data: { userId } });
+  }
+
   async lockByUserId(
     tx: Prisma.TransactionClient,
     userId: string,

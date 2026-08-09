@@ -49,6 +49,14 @@ describe('ledger invariants enforced by the database', () => {
     expect(after).toMatchObject({ subscriptionCredits: 10, addonCredits: 30 });
   });
 
+  it('a user holds at most one wallet, which is what makes registration safe to retry', async () => {
+    const { user } = await aUserWithWallet(50, 0);
+
+    await expect(prisma.creditWallet.create({ data: { userId: user.id } })).rejects.toThrow();
+
+    expect(await prisma.creditWallet.count({ where: { userId: user.id } })).toBe(1);
+  });
+
   it('requirements section 3 — a user has at most one current subscription', async () => {
     const { user } = await aUserWithWallet(50, 0);
     const plan = await prisma.plan.findFirstOrThrow({ where: { code: 'free' } });
