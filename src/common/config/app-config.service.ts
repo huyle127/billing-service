@@ -53,22 +53,6 @@ export class AppConfigService {
     return this.config.getOrThrow<string[]>('stripe.webhookSecrets');
   }
 
-  get webhookPollIntervalMs(): number {
-    return this.config.getOrThrow<number>('webhook.pollIntervalMs');
-  }
-
-  get webhookBatchSize(): number {
-    return this.config.getOrThrow<number>('webhook.batchSize');
-  }
-
-  get webhookMaxRetryCount(): number {
-    return this.config.getOrThrow<number>('webhook.maxRetryCount');
-  }
-
-  get webhookRetryBackoffMs(): number {
-    return this.config.getOrThrow<number>('webhook.retryBackoffMs');
-  }
-
   get provisioningSweepIntervalMs(): number {
     return this.config.getOrThrow<number>('provisioning.sweepIntervalMs');
   }

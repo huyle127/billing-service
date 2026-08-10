@@ -1,7 +1,7 @@
 import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';
-import { CreditLedger, User } from '@prisma/client';
+import { User } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Clock } from '../../common/clock/clock';
 import { FixedClock } from '../../common/clock/fixed-clock';
@@ -9,12 +9,12 @@ import { AppConfigModule } from '../../common/config/config.module';
 import { configurations } from '../../common/config/configuration';
 import { PrismaModule } from '../../common/prisma/prisma.module';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { CreditService } from '../../credit/services/credit.service';
 import { BillingModule } from '../billing.module';
 import { ALLOCATION_KEYS, ALLOCATION_REASONS, FREE_PLAN } from '../billing.constants';
 import { FakeStripeAdapter } from '../stripe/adapters/fake-stripe.adapter';
 import { StripeService } from '../stripe/interfaces/stripe-adapter.interface';
 import { EntitlementService } from './entitlement.service';
+import { SubscriptionAllocationService } from './subscription-allocation.service';
 
 const NOW = new Date('2026-08-15T09:30:00.000Z');
 
@@ -22,7 +22,7 @@ describe('the registration grant', () => {
   let moduleRef: TestingModule;
   let prisma: PrismaService;
   let entitlement: EntitlementService;
-  let credit: CreditService;
+  let allocation: SubscriptionAllocationService;
   const clock = new FixedClock(NOW);
 
   beforeAll(async () => {
@@ -42,7 +42,7 @@ describe('the registration grant', () => {
     await moduleRef.init();
     prisma = moduleRef.get(PrismaService);
     entitlement = moduleRef.get(EntitlementService);
-    credit = moduleRef.get(CreditService);
+    allocation = moduleRef.get(SubscriptionAllocationService);
   });
 
   afterAll(async () => {
@@ -106,7 +106,7 @@ describe('the registration grant', () => {
     ]);
   });
 
-  it('grants under this month key, so the first invoice for the month grants nothing further', async () => {
+  it('grants through the allocation owner, so asking it again for the same month grants nothing further', async () => {
     const plan = await freePlan();
     const user = await aGrantedUser();
     const subscription = await prisma.subscription.findFirstOrThrow({ where: { userId: user.id } });
@@ -117,11 +117,12 @@ describe('the registration grant', () => {
     ).toMatchObject({ idempotencyKey: ALLOCATION_KEYS.month(subscription.id, NOW) });
 
     await prisma.$transaction((tx) =>
-      credit.allocate(tx, user.id, {
-        ledger: CreditLedger.SUBSCRIPTION,
-        amount: plan.monthlyCredits,
-        idempotencyKey: ALLOCATION_KEYS.month(subscription.id, NOW),
-        replacing: false,
+      allocation.grantMonth(tx, {
+        userId: user.id,
+        subscriptionId: subscription.id,
+        monthlyCredits: plan.monthlyCredits,
+        month: NOW,
+        reason: ALLOCATION_REASONS.registration,
       }),
     );
 

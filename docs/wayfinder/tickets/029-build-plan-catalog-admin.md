@@ -1,4 +1,4 @@
-# 029 Build the plan and add-on catalog with admin CRUD
+# 029 Build the plan and add-on catalog, price changes, and subscriber migration
 
 <!-- parent: map-billing-service-build.md -->
 <!-- label: wayfinder:task -->
@@ -10,12 +10,19 @@
 
 ## Question
 
-Read and create the catalog. Price changes and subscriber migration are ticket 030 — this ticket
-stops before them.
+The catalog, and what happens to existing subscribers when an admin changes a plan's price.
+
+**Merged from the old ticket 030 on 2026-08-10.** The split put reading and creating the catalog here
+and changing it there, but the two rest on one fact: **Stripe Prices are immutable.** That is why this
+ticket archives rather than deletes, and it is equally why a price change has to mint a new Price and
+migrate subscribers. Split, the same idea had to be stated in both tickets and built against the same
+admin controller twice.
+
+## The catalog
 
 - `GET /v1/plans` and `GET /v1/addon-packages` public; `/v1/admin/plans` and
   `/v1/admin/addon-packages` behind the admin guard. `GET /v1/admin/users/:userId/billing` lands here
-  too. The credit adjustment route is ticket 022.
+  too, apart from its history portion, which is ticket 033. The credit adjustment route is ticket 022.
 - **Stripe owns price, we own credit entitlement.** Stripe has no concept of credits, so a local
   `Plan` row is required either way — ticket 008 dissolved the source-of-truth question rather than
   answering it.
@@ -42,6 +49,33 @@ future package is priced against.
 
 Seed them in `prisma/seed.ts` as the real entitlement, not as a placeholder comment.
 
+## The price change and the migration reconciler
+
+- `PATCH /v1/admin/plans/:id`. **Prices are immutable in Stripe**, so a price change creates a new
+  Price, archives the previous one, and repoints the local `Plan`.
+- The call **returns immediately.** Migration is not a stored job — it is **derived from state**:
+
+  ```
+  subscriptions WHERE status = 'ACTIVE'
+    AND stripePriceId <> (its plan's current stripePriceId)
+  ```
+
+  The `@@index([status, planId, stripePriceId])` exists for exactly this query. Each Subscription
+  records the Price it is actually on, so the outstanding work is visible in the rows themselves and
+  cannot be lost the way a job row can.
+- **Idempotent, resumable, and self-healing** if a Stripe call fails partway through a batch. Run it
+  any number of times; assert that running it twice changes nothing the second time.
+- **Migration takes effect at next renewal, with no proration and no mid-period charge.**
+- **A price change must never trigger credit allocation.** This is the clause that protects the ledger
+  and it follows from the no-proration choice: with no proration Stripe generates no immediate
+  invoice, so no `invoice.paid` with `billing_reason=subscription_update` is emitted, so ticket 026's
+  invoice handler never fires. Ticket 008 noted that choosing proration here would have turned every
+  price change into a mass credit giveaway. Assert the absence explicitly — the failure mode is silent.
+- **Changing a plan's credit entitlement** takes effect from the next allocation. Credits already
+  granted are never retroactively adjusted.
+- Add-on packages follow the same rules minus subscriber migration: purchases are one-time, so a price
+  change affects only future purchases.
+
 ## Requirement clauses closed
 
 Section 4:
@@ -49,3 +83,7 @@ Section 4:
 - Plan creation writes to Stripe then the database
 - Creation calls carry a Stripe idempotency key
 - Catalog is enumerated locally, never by listing Stripe products
+- A price change creates a new Stripe price and archives the old
+- Existing subscribers migrate at next renewal, no proration
+- The migration reconciler is idempotent and resumable
+- A price change never triggers credit allocation

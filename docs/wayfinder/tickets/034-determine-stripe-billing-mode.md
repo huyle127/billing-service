@@ -16,8 +16,9 @@ ever since. It is sharp enough to ticket now and small enough to finish in minut
 account object or from an existing test subscription through the API, using the secret key already in
 `.env`.
 
-**Why it matters.** `billing_mode` materially changes proration credit amounts. Ticket 030
-deliberately chose *no* proration for price-change migration, so that path is unaffected — but
+**Why it matters.** `billing_mode` materially changes proration credit amounts. Price-change
+migration (ticket 030, merged into 029 on 2026-08-10) deliberately chose *no* proration, so that
+path is unaffected — but
 `PATCH /v1/me/subscription` in ticket 031 is a genuine mid-cycle plan change and does prorate. Its
 expected amounts cannot be asserted until the mode is known, which is why 031 blocks on this.
 
@@ -53,7 +54,7 @@ revisit if coupons are ever introduced.
 
 - Ticket 031's `PATCH /v1/me/subscription` can now have its proration amounts asserted. Flexible mode
   is the newer engine and prorates per subscription item.
-- Ticket 030 is unaffected, as expected: it chose no proration for price-change migration, so no
-  proration is computed on that path at all.
+- Price-change migration is unaffected, as expected: it chose no proration, so no proration is
+  computed on that path at all.
 - Ticket 019 should expose `billing_mode.type` as a plain domain value if anything above the adapter
   ever needs it, rather than letting the nested object leak upward.

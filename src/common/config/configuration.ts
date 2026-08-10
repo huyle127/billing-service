@@ -53,13 +53,6 @@ export const stripeConfig = registerAs('stripe', () => ({
   webhookSecrets: secretList('STRIPE_WEBHOOK_SECRET'),
 }));
 
-export const webhookConfig = registerAs('webhook', () => ({
-  pollIntervalMs: integer('WEBHOOK_POLL_INTERVAL_MS', 2000),
-  batchSize: integer('WEBHOOK_BATCH_SIZE', 10),
-  maxRetryCount: integer('WEBHOOK_MAX_RETRY_COUNT', 5),
-  retryBackoffMs: integer('WEBHOOK_RETRY_BACKOFF_MS', 60000),
-}));
-
 export const provisioningConfig = registerAs('provisioning', () => ({
   sweepIntervalMs: integer('PROVISIONING_SWEEP_INTERVAL_MS', 60000),
   batchSize: integer('PROVISIONING_BATCH_SIZE', 50),
@@ -72,6 +65,5 @@ export const configurations = [
   databaseConfig,
   authConfig,
   stripeConfig,
-  webhookConfig,
   provisioningConfig,
 ];

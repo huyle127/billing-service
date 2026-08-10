@@ -307,6 +307,24 @@ covered the table has served its purpose and can retire in favour of the specs.
   explicit cast. Also found: the unique `stripeCustomerId` is *not* what makes concurrent
   provisioning safe for one user (both writers update the same row); the adapter's idempotency key
   is. 24 new tests, 152 total.
+- [024 Build webhook ingestion and the queue worker](tickets/024-build-webhook-ingestion-and-worker.md)
+  — shipped through OpenSpec change `build-webhook-ingestion-and-worker`; behaviour in
+  [`webhook-pipeline`](../../openspec/specs/webhook-pipeline/spec.md). **The queue, the worker and
+  the retry budget in the ticket's own title were not built** — processing is synchronous and
+  **Stripe owns the retry**, since a non-2xx answer is already a request to redeliver on a documented
+  backoff. Requirements §5 was amended for this. **Redelivery is judged by the stored status, not by
+  the row's existence**: a `COMPLETED` repeat is skipped, anything else is processed again, because
+  treating every duplicate as done would silently drop every event whose first attempt failed. The
+  signature verifies against a *list* of secrets — `stripe listen` prints a different one from the
+  Dashboard's. **The queue's leftovers were swept on 2026-08-10**, once an audit found them: migration
+  `20260810120000_drop_webhook_queue_columns` drops `retryCount` and `nextAttemptAt` and rebuilds
+  `WebhookStatus` without `PROCESSING` or `DEAD_LETTERED` — Postgres has no `ALTER TYPE … DROP VALUE`,
+  so the type is recreated — and the whole `webhookConfig` namespace went with them, four keys no
+  code read. Neither column carried information: `retryCount` was `0` on every row and
+  `nextAttemptAt` equalled `receivedAt`. Verifying
+  forwarding for ticket 002 exposed a defect that had nothing to do with Stripe — `deleteOutDir` plus
+  `incremental` made `npm run build` emit **nothing** on every run after the first, exit code 0, and
+  `dist/` empty; `incremental` has since been dropped.
 
 ## Not yet specified
 
@@ -340,7 +358,7 @@ Graduated on 2026-08-05, once module boundaries (004), the persistence schema (0
   not decided again.
 - **Stripe `billing_mode`** → [034 Determine the Stripe account's billing
   mode](tickets/034-determine-stripe-billing-mode.md). Sharp enough to ticket, and it blocks only
-  031, since ticket 030 chose no proration for price-change migration.
+  031, since price-change migration chose no proration.
 
 **Coverage gaps found while charting.** `requirement-coverage.md` has **no Section 7 or Section 8
 table**, so add-on purchase and billing history are tracked by nothing, and it carries no rows for the
@@ -362,23 +380,34 @@ Ruled beyond this destination. These never graduate.
 
 ## Tickets
 
+**Merged 2026-08-10, from nine open tickets to seven.** Ticket 027 folded into 026 and ticket 030
+into 029. Both splits were drawn around a Stripe object rather than around a decision: 026/027 split
+the webhook processor by event type, which put the shuffled-replay convergence test in the half that
+could only run against half the event history; 029/030 split the catalog by read-versus-change, which
+made both halves restate that Stripe Prices are immutable and build against the same admin
+controller. Tickets 028, 031, 032, 033 and 035 were looked at in the same pass and left alone — 028
+is already a merge, 032 and 033 each hold one trap worth its own attention, and 035 gets cheaper the
+sooner it runs.
+
+**027 → 026, 030 → 029. The numbers were not closed up**, so 027 and 030 are gaps and stay gaps. A
+ticket number is an identifier, not a position: closed tickets, archived OpenSpec changes and commit
+messages all cite these numbers, and shifting them would leave sealed records pointing at a
+different ticket that still reads plausibly — ticket 023 defers its internal key "to 028", which
+renumbering would silently repoint at the webhook handlers. Anything citing 027 or 030 means the
+pre-merge ticket and should be read at its successor above.
+
 Frontier (open, unblocked, unclaimed):
 
-- [002 Provision Stripe test account and CLI](tickets/002-provision-stripe-test-account.md) — task — only `stripe listen` forwarding left, checkable once 024 lands
-- [024 Build webhook ingestion and the queue worker](tickets/024-build-webhook-ingestion-and-worker.md) — task — unblocked by 019
-- [029 Build the plan and add-on catalog with admin CRUD](tickets/029-build-plan-catalog-admin.md) — task — unblocked by 020
+- [026 Build the webhook handlers: subscriptions, invoices, and the ordering guarantees](tickets/026-build-webhook-handlers.md) — task — unblocked by 025 — merges the old 027; split into two OpenSpec changes at propose time
+- [029 Build the plan and add-on catalog, price changes, and subscriber migration](tickets/029-build-plan-catalog-admin.md) — task — unblocked by 020 — merges the old 030
 - [035 Decide whether imports use the `@/` path alias](tickets/035-decide-import-path-alias.md) — task — cheapest while only twelve files exist
-- [025 Build the subscription lifecycle state machine](tickets/025-build-subscription-lifecycle.md) — task — unblocked by 023 — test the transition table only
 
 Blocked:
 
-- [026 Build the subscription webhook handlers and the ordering guarantees](tickets/026-build-subscription-webhook-handlers.md) — task — 024, 025
-- [027 Build the invoice webhook handlers and the credit allocation triggers](tickets/027-build-invoice-handlers-and-allocation.md) — task — 022, 024, 025
-- [028 Build the annual allocation cron and the internal endpoints](tickets/028-build-annual-allocation-cron.md) — task — 027
-- [030 Build the price change and subscriber migration reconciler](tickets/030-build-price-change-migration.md) — task — 029
+- [028 Build the annual allocation cron and the internal endpoints](tickets/028-build-annual-allocation-cron.md) — task — 026
 - [031 Build subscription self-service and payment methods](tickets/031-build-subscription-self-service.md) — task — 023, 025, 029, 034
-- [032 Build add-on credit purchase](tickets/032-build-addon-purchase.md) — task — 027, 029, 031
-- [033 Build billing history](tickets/033-build-billing-history.md) — task — 021, 025, 027
+- [032 Build add-on credit purchase](tickets/032-build-addon-purchase.md) — task — 026, 029, 031
+- [033 Build billing history](tickets/033-build-billing-history.md) — task — 021, 025, 026
 
 Every build ticket names the requirement clauses it closes. Between them tickets 018–033 account for
 all 54 clauses still marked `todo` in
@@ -388,6 +417,7 @@ criterion.
 Closed:
 
 - [001 Provision Neon and scaffold the repo](tickets/001-provision-neon-and-scaffold-repo.md) — task
+- [002 Provision Stripe test account and CLI](tickets/002-provision-stripe-test-account.md) — task — forwarding verified by hand 2026-08-10 against the endpoint 024 built
 - [003 Research Stripe object model and webhook semantics](tickets/003-research-stripe-object-model.md) — research
 - [006 Prototype atomic two-ledger consumption](tickets/006-prototype-atomic-consumption.md) — prototype
 - [004 Design module boundaries and layering](tickets/004-design-module-boundaries.md) — grilling
@@ -408,3 +438,7 @@ Closed:
 - [019 Build the Stripe adapter seam and its test fake](tickets/019-build-stripe-adapter.md) — task — OpenSpec change `build-stripe-adapter`, archived; capability spec [`stripe-adapter`](../../openspec/specs/stripe-adapter/spec.md)
 - [020 Build the auth module](tickets/020-build-auth-module.md) — task — OpenSpec change `build-auth-module`, archived; capability spec [`authentication`](../../openspec/specs/authentication/spec.md); four of six Section 9 clauses, the internal API key deferred to 023
 - [021 Build the credit ledger: consumption and reversal](tickets/021-build-credit-consumption.md) — task — OpenSpec change `build-credit-consumption`; all eight Section 6 consumption clauses
+- [022 Build the credit ledger: allocation, adjustment, and wallet freeze](tickets/022-build-credit-allocation-and-freeze.md) — task — OpenSpec change `build-credit-allocation-and-freeze`, archived; the four remaining Section 6 clauses
+- [023 Build registration provisioning and the Stripe sync reconciler](tickets/023-build-registration-provisioning.md) — task — OpenSpec change `build-registration-provisioning`, archived; capability spec [`subscription-provisioning`](../../openspec/specs/subscription-provisioning/spec.md); three Section 3 clauses, the internal key deferred to 028
+- [024 Build webhook ingestion and the queue worker](tickets/024-build-webhook-ingestion-and-worker.md) — task — OpenSpec change `build-webhook-ingestion-and-worker`, archived; capability spec [`webhook-pipeline`](../../openspec/specs/webhook-pipeline/spec.md); three Section 5 clauses and one Section 10
+- [025 Build the subscription lifecycle state machine](tickets/025-build-subscription-lifecycle.md) — task — OpenSpec change `build-subscription-lifecycle`, archived; capability spec [`subscription-lifecycle`](../../openspec/specs/subscription-lifecycle/spec.md); two Section 3 clauses, two Section 4, one Section 6 taken over from 027, one Section 10

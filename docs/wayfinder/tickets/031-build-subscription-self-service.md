@@ -33,7 +33,7 @@ The `/v1/me` surface a user's own dashboard drives.
   against what the schema can even hold, not only against what the code writes.
 - `PATCH` (plan or cycle change) produces proration in Stripe. **Its expected amounts depend on the
   account's `billing_mode`** — ticket 034 determines that, which is why this ticket blocks on it.
-  Note that a mid-cycle change also grants a full new monthly credit allocation (027); that is
+  Note that a mid-cycle change also grants a full new monthly credit allocation (026); that is
   intentional.
 
 ## Requirement clauses closed

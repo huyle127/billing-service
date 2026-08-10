@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { BillingCycle, Prisma, Subscription, SubscriptionStatus } from '@prisma/client';
+import {
+  BillingCycle,
+  Prisma,
+  Subscription,
+  SubscriptionEventType,
+  SubscriptionStatus,
+} from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { PENDING_SYNC_STATUSES } from '../billing.constants';
 
@@ -24,6 +30,21 @@ export interface ClaimedSubscription {
   createdAt: Date;
 }
 
+export interface StatusWrite {
+  status: SubscriptionStatus;
+  stripeStatus?: string;
+  canceledAt?: Date;
+  endedAt?: Date;
+}
+
+export interface NewSubscriptionEvent {
+  subscriptionId: string;
+  type: SubscriptionEventType;
+  reason: string;
+  stripeEventId?: string;
+  occurredAt: Date;
+}
+
 export type PendingSubscription = Prisma.SubscriptionGetPayload<{ include: { plan: true } }>;
 
 const PENDING_SYNC_SQL = Prisma.raw(
@@ -41,6 +62,22 @@ export class SubscriptionRepository {
     return tx.subscription.create({
       data: { ...subscription, status: SubscriptionStatus.ACTIVE },
     });
+  }
+
+  findById(tx: Prisma.TransactionClient, id: string): Promise<Subscription | null> {
+    return tx.subscription.findUnique({ where: { id } });
+  }
+
+  async writeStatus(
+    tx: Prisma.TransactionClient,
+    id: string,
+    write: StatusWrite,
+  ): Promise<void> {
+    await tx.subscription.update({ where: { id }, data: write });
+  }
+
+  async appendEvent(tx: Prisma.TransactionClient, event: NewSubscriptionEvent): Promise<void> {
+    await tx.subscriptionEvent.create({ data: event });
   }
 
   findPendingByUserId(userId: string): Promise<PendingSubscription | null> {

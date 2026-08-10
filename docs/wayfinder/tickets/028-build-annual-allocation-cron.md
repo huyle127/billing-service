@@ -6,7 +6,7 @@
 <!-- status: open -->
 <!-- assignee: -->
 <!-- output: src/billing/ -->
-<!-- blocked-by: 027 -->
+<!-- blocked-by: 026 -->
 
 ## Question
 
@@ -26,7 +26,7 @@ them.
 - **Catch up one month at a time.** Each missed period is its own `CreditTransaction` under its own
   month's allocation key — never one lump sum, which would be unauditable and would collide with the
   key scheme.
-- **Never allocate past `paidThroughAt`**, the boundary ticket 027 persists from `invoice.period_end`.
+- **Never allocate past `paidThroughAt`**, the boundary ticket 026 persists from `invoice.period_end`.
   We own that boundary precisely so this routine does not depend on Stripe being reachable.
 - **Time comes from the injected clock (018).** A Stripe test clock moves Stripe's clock, not ours, so
   without the injectable clock neither the catch-up across missed months nor the stop-at-boundary rule

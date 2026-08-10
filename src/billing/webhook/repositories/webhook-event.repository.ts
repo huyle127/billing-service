@@ -24,7 +24,6 @@ export class WebhookEventRepository {
           payload: event.payload as Prisma.InputJsonObject,
           status: WebhookStatus.RECEIVED,
           receivedAt,
-          nextAttemptAt: receivedAt,
         },
       });
     } catch (error) {

@@ -14,8 +14,8 @@ Status: `covered` · `partial` · `todo`
 | Registration grants plan and credits without contacting Stripe | `entitlement.service: writes the customer, the Free subscription, the wallet and the grant, with no Stripe id` · `auth.service: registers while every Stripe operation fails, leaving both identifiers null` · `auth-http: hands back a user already holding a plan and a balance` | covered |
 | Stripe customer and subscription provisioned immediately after registration | `provisioning.service: attaches both identifiers and leaves no sync state behind` · `provisioning.service: creates nothing a second time when it runs again` · `provisioning.service: adopts an object Stripe already holds once the idempotency key has expired` | covered |
 | A subscription with no Stripe id is a valid intermediate state | `auth-http: spends the registration grant straight away, and writes nothing for a repeated email` · `provisioning.service: sweeps everything outstanding and leaves a row not yet due alone` · `provisioning.service: never picks up an expired subscription, because history is not a backlog` | covered |
-| Expired Pro subscription spawns a new Free subscription | | todo |
-| Subscription credits are forfeited when a subscription expires | | todo |
+| Expired Pro subscription spawns a new Free subscription | `subscription-lifecycle.service: expires by forfeiting subscription credits and replacing the row with a Free subscription` · `subscription-lifecycle.service: cannot enter the Free row before the expiring row leaves the current set` | covered |
+| Subscription credits are forfeited when a subscription expires | `subscription-lifecycle.service: expires by forfeiting subscription credits and replacing the row with a Free subscription` | covered |
 | Cron allocates monthly for annual subscriptions | | todo |
 | Cron catches up one month at a time across missed periods | | todo |
 | Cron never allocates past the paid-through boundary | | todo |
@@ -24,8 +24,8 @@ Status: `covered` · `partial` · `todo`
 
 | Clause | Test | Status |
 | --- | --- | --- |
-| Lifecycle states are set by this service, not mirrored from Stripe | | todo |
-| Cancel keeps access until period end | | todo |
+| Lifecycle states are set by this service, not mirrored from Stripe | `subscription-transitions: carries these edges and answers unchanged for every other pair` · `subscription-lifecycle.service: answers unchanged for a transition the table does not carry, writing no status and no event` | covered |
+| Cancel keeps access until period end | `subscription-lifecycle.service: cancels without releasing the current slot or touching the balance` | covered |
 | Plan creation writes to Stripe then the database | | todo |
 | Creation calls carry a Stripe idempotency key | | todo |
 | A price change creates a new Stripe price and archives the old | | todo |
@@ -65,7 +65,7 @@ Status: `covered` · `partial` · `todo`
 | A consumption can be reversed at most once | `ledger-invariants: a consumption can be reversed at most once; credit.service: replays the first reversal` | covered |
 | Declines report `INSUFFICIENT_CREDITS` and `BILLING_FROZEN` distinctly | `credit.service: declines a shortfall and a frozen wallet distinctly; credit-http: reports a decline as a 200 carrying no transactions` | covered |
 | A decline emits a metric | `credit.service: counts every decline by reason / counts nothing for a transaction that rolled back` | covered |
-| Wallet freezes when a subscription goes past due | | todo |
+| Wallet freezes when a subscription goes past due | `subscription-lifecycle.service: freezes the wallet on past due and unfreezes on resolution, allocating nothing either way` | covered |
 | Resolving past due unfreezes and allocates the next period | | todo |
 | Add-on credits survive a freeze and never expire | `credit.service: takes nothing and records nothing when a wallet is frozen / refuses a draw the add-on ledger could satisfy, and allows it again once unfrozen / changes nothing when a frozen wallet is frozen or an active one unfrozen` | covered |
 | A freeze gates consumption only — allocation, adjustment and reset still apply | `credit.service: lets a frozen wallet be allocated to, adjusted, and reset` | covered |
@@ -102,5 +102,5 @@ built once against two real callers rather than once against none.
 | Clause | Test | Status |
 | --- | --- | --- |
 | Duplicate billing events handled safely | `webhook-http: skips a redelivered completed event and leaves exactly one row` | covered |
-| Subscription events recorded for reconciliation | | todo |
+| Subscription events recorded for reconciliation | `subscription-lifecycle.service: cancels without releasing the current slot or touching the balance` · `subscription-lifecycle.service: answers unchanged for a transition the table does not carry, writing no status and no event` | covered |
 | Sensitive payment data never stored locally | | todo |

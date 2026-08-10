@@ -54,19 +54,26 @@ verified by ticket 006 before the ledger is built on it.
 
 Lives in `billing/webhook/`. Requirements §5 defines the behaviour; this is the shape.
 
+**Processing is synchronous, and Stripe owns the retry.** Ticket 024 built no queue, no worker and
+no retry budget of ours: a non-2xx answer is already a request to redeliver, on Stripe's documented
+backoff. Requirements §5 was amended to match on 2026-08-09.
+
 ```
 POST /webhooks/stripe
-  → verify signature against raw body
-  → persist WebhookEvent (unique on Stripe event id)
-  → return 2xx immediately
-                                    ┌──────────────────────────┐
-worker (polling)                    │ WebhookEvent             │
-  → SELECT … FOR UPDATE SKIP LOCKED │ status, retryCount,      │
-  → re-fetch object from Stripe     │ nextAttemptAt, payload   │
-  → dispatch to handler             └──────────────────────────┘
-  → handler opens transaction, calls billing + credit services
-  → mark completed, or schedule retry, or dead-letter
+  → verify signature against raw body        ┌──────────────────────────┐
+  → look up WebhookEvent by Stripe event id  │ WebhookEvent             │
+      COMPLETED → acknowledge, do no work    │ status, failureReason,   │
+      anything else → process again          │ receivedAt, processedAt, │
+  → persist the row, then commit it          │ payload                  │
+  → re-fetch object from Stripe              └──────────────────────────┘
+  → dispatch by type to a handler registry
+  → handler opens its own transaction, calls billing + credit services
+  → mark COMPLETED and answer 2xx, or mark FAILED and answer non-2xx
 ```
+
+The row commits **before** processing, in its own transaction, so a handler failure still leaves a
+record. Redelivery is judged by the stored status rather than by the row's existence — treating any
+duplicate as done would silently drop every event whose first attempt failed.
 
 Signature verification needs the raw request body, so the Stripe webhook route is excluded from the
 global JSON body parser. This is a common silent failure in NestJS and is called out here because it

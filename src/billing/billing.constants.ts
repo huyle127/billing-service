@@ -8,6 +8,8 @@ export const FREE_PLAN = {
 
 export const REGISTRATION_TRANSACTION = LEDGER_TRANSACTION;
 
+export const LIFECYCLE_TRANSACTION = LEDGER_TRANSACTION;
+
 export const PENDING_SYNC_STATUSES = [
   SubscriptionStatus.PENDING,
   SubscriptionStatus.ACTIVE,
@@ -24,4 +26,12 @@ export const ALLOCATION_KEYS = {
 
 export const ALLOCATION_REASONS = {
   registration: 'registration',
+} as const;
+
+export const TRANSITION_REASONS = {
+  activated: 'activated',
+  renewed: 'renewed',
+  canceled: 'canceled',
+  pastDue: 'past_due',
+  expired: 'expired',
 } as const;

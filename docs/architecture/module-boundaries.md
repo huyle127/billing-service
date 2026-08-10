@@ -45,6 +45,7 @@ to put in it:
   decorators/        parameter and metadata decorators specific to this module.
   listeners/         event-bus subscribers. Audit, notification, analytics only.
   <module>.constants.ts
+  <module>.errors.ts   this module's DomainException subclasses, when it declares any.
   <module>.module.ts
 ```
 
@@ -111,6 +112,18 @@ suffix must name the role the file actually plays: `subscription.controller.ts`,
 service — not a contract, and not an infrastructure adapter. A suffix that lies is worse than none,
 because it is believed.
 
+**Three error suffixes exist and they are not interchangeable**, which is why they read as an
+inconsistency at a glance and are not one:
+
+| File | Holds |
+| --- | --- |
+| `<module>.errors.ts` | that module's `DomainException` subclasses, and nothing else |
+| `<thing>.error.ts` | failure *classification* — logic that decides what a failure means, as `billing/stripe/stripe.error.ts` sorts Stripe failures into retryable and permanent |
+| `common/errors/domain.exception.ts` | the `DomainException` base every module extends |
+
+A module that only declares error classes uses the plural. Renaming a classifier to the plural would
+tell readers it is a list of classes when it is a decision procedure.
+
 **`.port.ts` is not used**, deliberately. Ticket 004 rejected hexagonal ports for a single provider,
 and importing the vocabulary would reopen a closed decision by the back door.
 
@@ -134,7 +147,7 @@ nobody handles, a config key that reads `undefined`.
 | Error codes | the `ErrorCode` union in `common/errors` | the union type |
 | Domain enums — status, ledger, cycle, transaction type | Prisma-generated enums | the generated types |
 | Stripe metadata keys, idempotency keys, API version, provider statuses | `billing/stripe/stripe.constants.ts` | a test asserting the seam builds none of them from a literal |
-| Webhook event type strings | one constants module beside the handler registry | *to be added by ticket 024* |
+| Webhook event type strings | `billing/webhook/webhook.constants.ts`, beside the handler registry | `WebhookEventType` is a union derived from it |
 | Adapter operation names | `STRIPE_OPERATIONS` in the same file | `StripeOperation` is a union derived from it |
 | Event-bus event names | one constants file under the module that emits them | *to be added by the change that introduces the bus* |
 

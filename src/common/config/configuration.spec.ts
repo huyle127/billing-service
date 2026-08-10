@@ -22,13 +22,13 @@ describe('configuration', () => {
   });
 
   it('refuses a malformed integer rather than coercing it', async () => {
-    process.env.WEBHOOK_BATCH_SIZE = 'ten';
+    process.env.PROVISIONING_RETRY_BACKOFF_MS = 'ten';
 
     await expect(
       Test.createTestingModule({
         imports: [ConfigModule.forRoot({ isGlobal: true, load: configurations })],
       }).compile(),
-    ).rejects.toThrowError('WEBHOOK_BATCH_SIZE must be a non-negative integer');
+    ).rejects.toThrowError('PROVISIONING_RETRY_BACKOFF_MS must be a non-negative integer');
   });
 
   it('refuses a negative value rather than reading it as a disabled feature', () => {

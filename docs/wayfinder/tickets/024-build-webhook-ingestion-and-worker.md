@@ -31,7 +31,7 @@ Shipped through OpenSpec change `build-webhook-ingestion-and-worker`.
 ## Question
 
 The pipeline, not the handlers. Build the machinery that receives, persists, and retries; the domain
-handlers are tickets 026, 027, and 031.
+handlers are tickets 026 and 031.
 
 - `POST /v1/webhooks/stripe`. **Signature verified against the raw body** preserved by 018, against
   a **list** of signing secrets — the secret printed by `stripe listen` differs from the Dashboard's,
@@ -47,7 +47,7 @@ handlers are tickets 026, 027, and 031.
 - **The registry dispatches to one file per event type in `billing/webhook/handlers/`**, not to arms
   of a `switch`. The binding layout is in
   [`module-boundaries.md`](../../architecture/module-boundaries.md); the reason it is named here is
-  that tickets 026, 027, and 031 each add handlers to whatever shape this ticket leaves behind, and a
+  that tickets 026 and 031 each add handlers to whatever shape this ticket leaves behind, and a
   switch is only ever grown, never split. **Event type strings are declared once** and referenced by
   both the registry and the handler that claims them.
 - **Three outcomes, not two: completed, failed, and deferred.** A deferral — the event's subject does
@@ -122,8 +122,8 @@ side. A thrown error that is not that sentinel becomes a `failed` outcome, so a 
 failure or simply throw.
 
 **The trivial handler claims `customer.subscription.trial_will_end`.** It had to be a real Stripe
-type that no later ticket claims — 026 takes `customer.subscription.created/.updated/.deleted` and
-`customer.created/.updated`, 027 takes `invoice.paid` and `invoice.payment_failed`, 031 takes
+type that no later ticket claims — 026 takes `customer.subscription.created/.updated/.deleted`,
+`customer.created/.updated`, `invoice.paid` and `invoice.payment_failed`; 031 takes
 `payment_method.*`. It is also a `stripe trigger` target, which is what makes the manual check
 below concrete.
 

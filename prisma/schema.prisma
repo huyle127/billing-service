@@ -55,10 +55,8 @@ enum PaymentKind {
 
 enum WebhookStatus {
   RECEIVED
-  PROCESSING
   COMPLETED
   FAILED
-  DEAD_LETTERED
 }
 
 enum SubscriptionEventType {
@@ -267,11 +265,9 @@ model WebhookEvent {
   type          String
   payload       Json
   status        WebhookStatus @default(RECEIVED)
-  retryCount    Int           @default(0)
-  nextAttemptAt DateTime      @default(now())
   failureReason String?
   receivedAt    DateTime      @default(now())
   processedAt   DateTime?
 
-  @@index([status, nextAttemptAt])
+  @@index([status, receivedAt])
 }

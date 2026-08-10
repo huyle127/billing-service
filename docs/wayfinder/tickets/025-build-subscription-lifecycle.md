@@ -3,7 +3,7 @@
 <!-- parent: map-billing-service-build.md -->
 <!-- label: wayfinder:task -->
 <!-- mode: AFK -->
-<!-- status: open -->
+<!-- status: closed -->
 <!-- assignee: -->
 <!-- output: src/billing/ -->
 <!-- blocked-by: 022, 023 -->
@@ -37,7 +37,7 @@ are written without tests.
 - Every transition appends a `SubscriptionEvent` with type, reason, and the Stripe event reference,
   inside the same transaction. This is the reconciliation audit trail, so it is never an event-bus
   listener's job — ticket 004's rule is that no invariant is ever maintained by a listener.
-- Webhook handlers (026, 027) drive transitions through this state machine and never write `status`
+- Webhook handlers (026) drive transitions through this state machine and never write `status`
   directly.
 
 **Trap.** Creating the new Free subscription while the Pro row is still current violates the
@@ -56,6 +56,11 @@ Section 4:
 
 - Lifecycle states are set by this service, not mirrored from Stripe
 - Cancel keeps access until period end
+
+Section 6, taken over from the old ticket 027 — now merged into 026 — because the freeze rides
+inside the transition:
+
+- Wallet freezes when a subscription goes past due
 
 Section 10:
 
