@@ -49,7 +49,10 @@ guarantee ordering and that processing must never assume it. Four rules were ado
    applied; the payload is a notification that something changed, not the authority on what it
    changed to. This is Stripe's documented mitigation. Accepted cost: one network call per event,
    and a processing dependency on Stripe availability — mitigated by the fact that failures land
-   in the existing retry queue rather than being lost.
+   in the existing retry queue rather than being lost. *(Amended by requirements §5 on 2026-08-09 —
+   processing became synchronous, so a deferred event is answered non-2xx and Stripe redelivers it.
+   The rule that deferral must stay distinguishable from failure survives; the queue it named does
+   not. See ticket 024.)*
 2. **Monotonic guard.** Period-derived state only advances, never regresses, so a late stale event
    cannot roll a subscription backwards. The subscription item's period end is the version marker.
 3. **Defer, do not fail**, when an event's subject does not exist locally yet. The existing retry

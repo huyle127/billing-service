@@ -314,7 +314,7 @@ The Billing Service is responsible for synchronizing and maintaining billing inf
 
 Webhook events should be processed idempotently by Stripe event ID.
 
-All incoming Stripe webhook events are persisted in a `WebhookEvent` table to maintain idempotency, audit history, and support internal retries.
+All incoming Stripe webhook events are persisted in a `WebhookEvent` table to maintain idempotency and audit history.
 
 Each `WebhookEvent` record tracks:
 
@@ -325,9 +325,11 @@ Each `WebhookEvent` record tracks:
 - Retry count.
 - Failure reason.
 
-The endpoint returns a 2xx response after the event is persisted; event processing is performed asynchronously.
+The endpoint persists the event, processes it within the same request, and returns 2xx once processing has succeeded. **Processing is synchronous.** Amended 2026-08-09, replacing an asynchronous queue and worker.
 
-Failed events are placed on a retry queue and reprocessed after a fixed backoff time. After exceeding the maximum retry count, events are moved to a dead-letter queue for manual review.
+Synchronous processing is chosen because the retry mechanism it gives up is one Stripe already provides. A handler that fails is answered with a non-2xx response, and Stripe redelivers the event on its own documented backoff schedule until that window expires. Running a queue, a worker and a retry budget of our own would be a second copy of that machinery, kept correct by us, to reach the same outcome.
+
+What this costs, and is accepted: Stripe's redelivery window is finite, so an event failing for longer than that window is abandoned by Stripe. The `WebhookEvent` row survives it, carrying its status and failure reason, so an abandoned event is still visible locally for manual review — the dead-letter queue's purpose is served by the row rather than by a queue. Handlers must therefore stay short enough to answer inside Stripe's request timeout; any operation that cannot is the point at which asynchronous processing must be reconsidered.
 
 Core webhook events include:
 
@@ -352,7 +354,7 @@ Processing rules:
 
 1. **Re-fetch, do not trust the payload's implied sequence.** When an event is processed, the affected Stripe object is re-fetched from the Stripe API and the current state is applied. The webhook payload is treated as a notification that something changed, not as the authoritative description of what it changed to. This is Stripe's documented mitigation for out-of-order delivery.
 2. **Apply a monotonic guard.** State derived from a subscription period is only advanced, never moved backwards, so a late-arriving stale event cannot regress a subscription. The subscription item's period end serves as the version marker.
-3. **Defer rather than fail** when an event cannot yet be applied because its subject does not exist locally. The event is left in the retry queue described above and reprocessed after backoff. No separate mechanism is required — the existing retry machinery covers it — but such deferrals must be distinguishable from genuine processing failures so they do not consume the retry budget in the same way.
+3. **Defer rather than fail** when an event cannot yet be applied because its subject does not exist locally. The event is answered with a non-2xx response so that Stripe redelivers it, which is the same mechanism a genuine failure uses. The two must nonetheless remain distinguishable in the stored `WebhookEvent` row, because they mean different things to whoever reads that history: a deferral is an ordinary race that is expected to resolve itself, and a failure is not. Amended 2026-08-09 — with retries owned by Stripe there is no retry budget of ours for a deferral to consume, so the distinction is now recorded for observability rather than to protect a budget.
 4. **Idempotency is enforced at two layers**, because they protect against different things. Ingestion is idempotent by Stripe event ID, which stops the identical event being processed twice. Effects that grant value are additionally idempotent on their own natural key, which stops two *distinct* events causing the same grant twice; see Credit Allocation Triggers in §6.
 
 Because processing is order-independent and re-fetches current state, replaying the entire event history must converge on the same result as processing it in order.

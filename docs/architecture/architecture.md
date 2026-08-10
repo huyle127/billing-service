@@ -85,9 +85,11 @@ history converges on the same result as processing it in order.
   to. This happens before the transaction opens.
 - **Monotonic guard.** Period-derived state only advances, never regresses, so a late stale event
   cannot roll a subscription backwards.
-- **Defer, do not fail.** An event whose subject does not exist locally yet returns to the queue.
-  Deferrals are distinguishable from genuine failures so they do not exhaust the retry budget and
-  land in the dead-letter queue spuriously.
+- **Defer, do not fail.** An event whose subject does not exist locally yet is answered non-2xx so
+  Stripe redelivers it, and is recorded on the `WebhookEvent` row as a deferral rather than as a
+  failure. Amended 2026-08-09 with requirements §5 — processing is synchronous, so there is no queue
+  to return to and no retry budget of ours to exhaust; the distinction is kept for whoever reads the
+  history.
 - **Two layers of idempotency.** Ingestion is idempotent on Stripe event id. Credit allocation is
   additionally idempotent on invoice id plus billing period, enforced by a unique constraint,
   because two *distinct* events can describe the same paid invoice.

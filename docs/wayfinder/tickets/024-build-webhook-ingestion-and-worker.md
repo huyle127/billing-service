@@ -3,10 +3,30 @@
 <!-- parent: map-billing-service-build.md -->
 <!-- label: wayfinder:task -->
 <!-- mode: AFK -->
-<!-- status: open -->
+<!-- status: closed (2026-08-10) -->
 <!-- assignee: -->
 <!-- output: src/billing/webhook/ -->
 <!-- blocked-by: 018, 019 -->
+<!-- change: build-webhook-ingestion-and-worker -->
+
+## Amended 2026-08-09 — processing is synchronous, and there is no worker
+
+**Read this before the rest of the ticket.** Everything below was written against requirements §5's
+asynchronous queue. §5 was amended on 2026-08-09 to **synchronous** processing, because Stripe's own
+redelivery already provides the retry a queue of ours would reimplement. Where the two disagree, this
+section wins:
+
+- **No schema change and no migration.** `DEFERRED` and `deferralCount` are not added. The existing
+  `WebhookStatus` values cover every state the synchronous design reaches, and a deferral is
+  distinguished from a failure by the reason recorded on the row.
+- **No worker, no scheduler, no retry budget of ours.** A failed or deferred event is answered
+  non-2xx and Stripe redelivers it. "Processing is asynchronous" below is superseded.
+- **One rule replaces all of that**, and it is the trap the queue avoided for free: a redelivery is
+  judged by the row's *recorded status*, not by the row's existence. Treating every duplicate
+  `stripeEventId` as already handled would silently drop every event whose first attempt failed.
+
+The title still says "queue worker" and the body is left as written, so the route stays legible.
+Shipped through OpenSpec change `build-webhook-ingestion-and-worker`.
 
 ## Question
 
@@ -36,7 +56,7 @@ handlers are tickets 026, 027, and 031.
   error, and treating it as one would land normal traffic in the dead-letter queue. Ticket 026's
   handlers are the first to return it; define the outcome type here.
 
-### The schema cannot express a deferral yet — settled 2026-08-05
+### The schema cannot express a deferral yet — settled 2026-08-05, superseded
 
 Found while charting: `WebhookStatus` is `RECEIVED, PROCESSING, COMPLETED, FAILED, DEAD_LETTERED`
 and there is a single `retryCount`. The rule above therefore has nowhere to live. **This ticket
@@ -80,3 +100,41 @@ Section 5:
 Section 10:
 
 - Duplicate billing events handled safely
+
+## Answer
+
+Built as `src/billing/webhook/` — controller, service, `WebhookEvent` repository, and a
+`handlers/` directory holding the registry and one handler. No worker, no schema change, no
+migration; `prisma/schema.prisma` is untouched. Six tests in `test/webhook-http.spec.ts`.
+
+**Processing needed a home once the worker was deleted, and it is not the controller.** The
+amendment removed the worker, which was where dispatch, the transaction, and the outcome recording
+lived. The change's tasks named only a controller, so the obvious reading was to put all of it
+there. It went into `webhook.service.ts` instead: the controller does HTTP — verify, translate a
+bad signature into 400, translate a non-completed outcome into 503 — and the service owns the
+pipeline. This matches every other module here and keeps the pipeline testable without a socket.
+
+**A non-completed outcome has to roll the handler's transaction back, and returning it cannot do
+that.** A handler that writes and then reports `deferred` would otherwise have its partial writes
+committed by the very transaction meant to be atomic. Processing therefore throws
+`IncompleteOutcomeRollback` out of `$transaction` carrying the outcome, and unwraps it on the far
+side. A thrown error that is not that sentinel becomes a `failed` outcome, so a handler may report
+failure or simply throw.
+
+**The trivial handler claims `customer.subscription.trial_will_end`.** It had to be a real Stripe
+type that no later ticket claims — 026 takes `customer.subscription.created/.updated/.deleted` and
+`customer.created/.updated`, 027 takes `invoice.paid` and `invoice.payment_failed`, 031 takes
+`payment_method.*`. It is also a `stripe trigger` target, which is what makes the manual check
+below concrete.
+
+**The deferral/failure distinction lives in the reason string, not the status.** Both write
+`FAILED`; `failureReason` is prefixed `deferred: ` or `failed: `, built from `OUTCOME_STATUSES` so
+the prefix and the outcome name cannot drift apart. This is what let the ticket's `DEFERRED` enum
+value and `deferralCount` column stay unbuilt.
+
+**Config was already there.** `stripeConfig.webhookSecrets`, `AppConfigService.stripeWebhookSecrets`
+and the `.env.example` note shipped with ticket 018, tested by
+`configuration: reads more than one webhook signing secret`. Task 1.1 closed on inspection.
+
+**Ticket 002's forwarding check is still open.** `stripe listen --forward-to` needs a real CLI and
+network, so it is a manual run recorded in ticket 002 — not something this change could close.

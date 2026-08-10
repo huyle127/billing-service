@@ -143,8 +143,9 @@ LIMIT 50
 FOR UPDATE SKIP LOCKED;
 ```
 
-`FOR UPDATE SKIP LOCKED` lets several workers run concurrently without processing the same row —
-the same mechanism the webhook queue uses.
+`FOR UPDATE SKIP LOCKED` lets several sweeps run concurrently without processing the same row. It is
+the provisioning reconciler's mechanism alone — webhook processing became synchronous on 2026-08-09
+and has no queue for it to guard (requirements §5).
 
 The equivalent index, `"BillingCustomer_pending_sync"`, exists on `"BillingCustomer"` — quoted, and
 spelled exactly as the Prisma model, per the identifier convention in §5.

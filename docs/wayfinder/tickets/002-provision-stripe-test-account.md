@@ -3,7 +3,7 @@
 <!-- parent: map-billing-service-build.md -->
 <!-- label: wayfinder:task -->
 <!-- mode: HITL -->
-<!-- status: open -->
+<!-- status: closed (2026-08-10) -->
 <!-- assignee: -->
 <!-- blocked-by: -->
 
@@ -55,7 +55,29 @@ Mostly resolved. Verified live against the Stripe API on 2026-08-04.
 - **Ticket 008** — the catalog exists in Stripe first, which strengthens the case for Stripe (or a
   local table referencing these Price IDs) as source of truth rather than static config.
 
-**Not yet verified:** that `stripe listen --forward-to` actually delivers to our endpoint. A
-signing secret is present in `.env`, implying the command has been run, but end-to-end forwarding
-cannot be confirmed until an application exists to receive it. This ticket stays open for that
-check, which should happen as part of ticket 001.
+## Forwarding verified — 2026-08-10
+
+The last open item. `stripe listen --forward-to localhost:3000/v1/webhooks/stripe` was run by hand
+against the endpoint ticket 024 built, and `stripe trigger` drove a full subscription cascade
+through it. Twelve events forwarded, twelve `200`, twelve `WebhookEvent` rows — twelve distinct
+`stripeEventId`, every one `COMPLETED` with a null `failureReason`:
+
+`customer.created` · `product.created` · `plan.created` · `price.created` · `setup_intent.created` ·
+`invoice.finalized` · `invoice.paid` · `invoice.created` · `invoice.payment_succeeded` ·
+`customer.updated` · `customer.subscription.created` · `customer.subscription.trial_will_end`
+
+Only the last has a handler; the other eleven took the unsubscribed-type path and completed without
+work, which is the designed behaviour. What the run proves is the part that could only be proved
+live: the CLI's signature verifies against the raw body preserved by 018, and the row is persisted.
+
+**The secret already in `.env` is the CLI's** — no second entry was needed, so the list config that
+ticket 024 built for rotation was not exercised here. It is still right to have: the Dashboard's
+secret differs, and adding it later must not need a redeploy.
+
+**The failure that cost the first attempt was ours, not Stripe's.** `stripe listen` answered
+`dial tcp [::1]:3000: connectex` because nothing was listening — and the reason nothing was
+listening is that `npm run build` silently emits nothing on any run after the first.
+`nest-cli.json` sets `deleteOutDir: true` while `tsconfig.json` sets `incremental: true`, so nest
+deletes `dist/`, tsc reads `tsconfig.build.tsbuildinfo`, concludes nothing changed, and skips the
+emit. Exit code 0, empty `dist/`. Deleting the tsbuildinfo fixes the run; the standing fix is to
+drop one of the two settings.

@@ -117,12 +117,12 @@ rules:
     - State which wayfinder ticket this change implements, by name and number.
     - Name the requirement clauses from docs/testing/requirement-coverage.md that this change
       moves off `todo`, quoting them verbatim so they can be matched mechanically.
-    - Declare the test budget: how many new tests this change adds. The ceiling is 10, and
+    - Declare the test budget — how many new tests this change adds. The ceiling is 10, and
       exceeding it requires the reason stated here. See docs/testing/strategy.md.
   design:
     - Optional, and 80 lines when it exists. Write it only for a decision THIS change is the
       first to make. A change that merely applies decisions already closed has no design file.
-    - One paragraph per decision: what was chosen, and the one reason it beat the alternative.
+    - One paragraph per decision — what was chosen, and the one reason it beat the alternative.
       Do not narrate rejected options nobody proposed, and do not restate what a ticket, an ADR
       or an architecture doc already says — link it.
     - Do not re-litigate decisions already closed on the wayfinder map. Link the ticket that
@@ -130,8 +130,9 @@ rules:
     - Call out explicitly any schema change needed, and state that it ships as a migration
       generated with `migrate diff` and applied with `migrate deploy`.
   tasks:
-    - Ceiling 15 lines. One line per task, imperative, naming the file it touches. A task whose
-      description needs a second line is either two tasks or reasoning that belongs in design.
+    - Ceiling 15 tasks, each exactly one line — imperative, naming the file it touches. Section
+      headings do not count. A task whose description needs a second line is either two tasks or
+      reasoning that belongs in design.
     - Do not write a task per test. Tests ship inside the task that implements the behaviour.
     - Order tasks so tests come first for credit ledger and subscription lifecycle rules, and
       after implementation for controllers, Prisma wiring, and configuration.

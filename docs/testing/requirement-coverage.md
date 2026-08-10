@@ -38,15 +38,16 @@ Status: `covered` · `partial` · `todo`
 
 | Clause | Test | Status |
 | --- | --- | --- |
-| Signature verification against the raw body | | todo |
-| Endpoint returns 2xx once the event is persisted | | todo |
-| Ingestion is idempotent by Stripe event id | | todo |
-| Failed events retry with backoff | | todo |
-| Events exceeding the retry budget are dead-lettered | | todo |
+| Signature verification against the raw body | `webhook-http: rejects a forged signature, persists nothing, and accepts the second configured secret` | covered |
+| Endpoint returns 2xx once the event is persisted | `webhook-http: skips a redelivered completed event and leaves exactly one row` · `webhook-http: dispatches by type and completes an unsubscribed type without work` | covered |
+| Ingestion is idempotent by Stripe event id | `webhook-http: skips a redelivered completed event and leaves exactly one row` | covered |
+| Failed events are answered non-2xx so Stripe redelivers | `webhook-http: answers non-2xx and records the reason when a handler fails` · `webhook-http: processes a redelivered failed event again` | covered |
+| An abandoned event stays on record with its failure reason | `webhook-http: answers non-2xx and records the reason when a handler fails` | covered |
 | Processing never assumes event ordering | | todo |
 | Handlers re-fetch the object rather than trusting the payload | | todo |
 | Period-derived state advances monotonically | | todo |
-| An event whose subject is missing defers rather than failing | | todo |
+| An event whose subject is missing defers rather than failing | `webhook-http: records a deferral distinguishably from a failure` | partial — the pipeline records a deferral as its own outcome; no handler defers on a real missing subject until 026 |
+| A redelivered event is judged by its recorded status, not its existence | `webhook-http: processes a redelivered failed event again` · `webhook-http: skips a redelivered completed event and leaves exactly one row` | covered |
 | Replaying full history converges on the ordered result | | todo |
 | Webhooks never create domain rows | | todo |
 
@@ -100,6 +101,6 @@ built once against two real callers rather than once against none.
 
 | Clause | Test | Status |
 | --- | --- | --- |
-| Duplicate billing events handled safely | | todo |
+| Duplicate billing events handled safely | `webhook-http: skips a redelivered completed event and leaves exactly one row` | covered |
 | Subscription events recorded for reconciliation | | todo |
 | Sensitive payment data never stored locally | | todo |

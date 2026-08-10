@@ -4,6 +4,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { BillingModule } from './billing/billing.module';
 import { StripeModule } from './billing/stripe/stripe.module';
+import { WebhookModule } from './billing/webhook/webhook.module';
 import { ClockModule } from './common/clock/clock.module';
 import { AppConfigModule } from './common/config/config.module';
 import { configurations } from './common/config/configuration';
@@ -25,6 +26,7 @@ import { UserModule } from './user/user.module';
     AuthModule,
     BillingModule,
     CreditModule,
+    WebhookModule,
   ],
 })
 export class AppModule {}

@@ -243,7 +243,10 @@ POST /v1/webhooks/stripe
 
 Authenticated by Stripe signature, not by token — the one route that bypasses the auth guards
 entirely. Excluded from the global JSON body parser, because signature verification needs the raw
-body. Returns 2xx as soon as the event is persisted; processing is asynchronous.
+body. The event is persisted first, then processed within the same request, and 2xx is returned once
+processing has succeeded — **processing is synchronous**, so a failure or a deferral is answered
+non-2xx and Stripe redelivers. Amended 2026-08-09 with requirements §5, which previously specified an
+asynchronous queue.
 
 ## Billing history
 
