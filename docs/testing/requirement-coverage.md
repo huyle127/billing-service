@@ -16,9 +16,9 @@ Status: `covered` · `partial` · `todo`
 | A subscription with no Stripe id is a valid intermediate state | `auth-http: spends the registration grant straight away, and writes nothing for a repeated email` · `provisioning.service: sweeps everything outstanding and leaves a row not yet due alone` · `provisioning.service: never picks up an expired subscription, because history is not a backlog` | covered |
 | Expired Pro subscription spawns a new Free subscription | `subscription-lifecycle.service: expires by forfeiting subscription credits and replacing the row with a Free subscription` · `subscription-lifecycle.service: cannot enter the Free row before the expiring row leaves the current set` | covered |
 | Subscription credits are forfeited when a subscription expires | `subscription-lifecycle.service: expires by forfeiting subscription credits and replacing the row with a Free subscription` | covered |
-| Cron allocates monthly for annual subscriptions | | todo |
-| Cron catches up one month at a time across missed periods | | todo |
-| Cron never allocates past the paid-through boundary | | todo |
+| Cron allocates monthly for annual subscriptions | `annual-allocation.service: grants the month a due subscription has reached, and passes over one not yet current` · `annual-allocation.service: grants nothing on a second run over the same months` | covered |
+| Cron catches up one month at a time across missed periods | `annual-allocation.service: catches up three missed months as three grants under three distinct keys` | covered |
+| Cron never allocates past the paid-through boundary | `annual-allocation.service: walks a month-end term to its boundary and never grants the month past it` · `credit-schedule: walks an annual term as twelve distinct months and stops on the boundary, not inside it` | covered |
 
 ## Section 4 — Subscription and catalog
 
@@ -86,16 +86,16 @@ Status: `covered` · `partial` · `todo`
 | Refresh token hash stored; logout revokes | `auth.service: stores the hash of the refresh token it hands out, not the token` · `auth.service: clears the stored hash on logout` | covered |
 | User endpoints reject an absent or invalid token | `auth-http: rejects every shape of unusable access token with 401` | covered |
 | Admin endpoints reject a user token | `auth-http: lets an admin token through and turns a user token away` | covered |
-| Internal key yields a service principal with no user identity | | todo — ticket 028 |
-| Internal endpoints reject "act on behalf of" semantics | | todo — ticket 028 |
+| Internal key yields a service principal with no user identity | `internal-endpoints: opens only for the internal key, and not for a user token` | covered |
+| Internal endpoints reject "act on behalf of" semantics | `internal-endpoints: refuses a request naming a user to act for, rather than ignoring it` | covered |
 
-The last two are deferred deliberately, and the deferral moved from ticket 023 to ticket 028. Ticket
-023 was going to ship `POST /v1/internal/provisioning/run`; it shipped an in-process schedule for the
+The last two were deferred from ticket 020 to 023 and then to 028, which closed them. Ticket 023 was
+going to ship `POST /v1/internal/provisioning/run`; it shipped an in-process schedule for the
 provisioning sweep instead, which left that endpoint with no caller of its own. The rule that decides
 this is ticket 020's own — build an operation when a caller exists — and it is why 020 refused to
-assert the guard against a probe controller living in a test. Ticket 028 carries
-`POST /v1/internal/allocations/run` and now carries the provisioning route too, so one guard gets
-built once against two real callers rather than once against none.
+assert the guard against a probe controller living in a test. Ticket 028 brought
+`POST /v1/internal/allocations/run` and the provisioning route with it, so the guard was built once
+against two real callers rather than once against none.
 
 ## Section 10 — Non-functional
 

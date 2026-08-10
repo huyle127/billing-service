@@ -3,7 +3,7 @@
 <!-- parent: map-billing-service-build.md -->
 <!-- label: wayfinder:task -->
 <!-- mode: AFK -->
-<!-- status: open -->
+<!-- status: closed -->
 <!-- assignee: -->
 <!-- output: src/billing/ -->
 <!-- blocked-by: 026 -->
@@ -47,6 +47,53 @@ decides this — **build an operation when a caller exists**, which is why 020 r
 guard against a probe controller living in a test. Building it here gives the guard **two** real
 callers rather than none, and `/v1/internal/provisioning/run` invokes the same `ProvisioningService.sweep()`
 the schedule invokes.
+
+## The month arithmetic, settled 2026-08-10 before the build
+
+Ticket 026 shipped `nextCreditAt` as `period.start` with `setUTCMonth(+1)`, which overflows: an annual
+term starting 31 January dated the next credit at **3 March**, so February's allocation key was never
+minted. Clamping alone would only trade a missing month for a spare one — chaining `+1 month` off each
+clamped value drifts backwards (31 → 28 → 28 → …) until the twelfth advance lands *inside*
+`paidThroughAt` and a thirteenth month is granted against a term that bought twelve.
+
+The rule is therefore **anchored, not chained**:
+
+- `nextCreditAt(after, paidThrough)` in `src/billing/services/credit-schedule.ts` is the **only** place
+  month arithmetic happens. This ticket calls it and computes no dates of its own.
+- The anchor day is the day-of-month of **`paidThroughAt`**. No column is added, and 026's write cannot
+  disagree with 028's advance — an annual term's start and end share a day-of-month, and where Stripe
+  clamps them apart (29 Feb → 28 Feb) `paidThroughAt` is the value both sides can read.
+- Keys stay `ALLOCATION_KEYS.month(subscriptionId, at)` and grants stay
+  `SubscriptionAllocationService.grantMonth`, both from 026. **This ticket builds neither.** That is
+  what keeps one annual-credit mechanism instead of two.
+- Proved by `credit-schedule.spec.ts`: a full annual term walks twelve *distinct* keys and the twelfth
+  advance lands exactly on `paidThroughAt`, so the `nextCreditAt < paidThroughAt` predicate stops there.
+
+## Answered before the build, 2026-08-10
+
+- **Which subscriptions are due**: `ACTIVE`, plus `CANCELED` still inside `paidThroughAt`. An annual
+  term is paid upfront, so cancelling mid-year must not forfeit months already bought — the same rule
+  031 states for access. `PENDING` never earns; `PAST_DUE` is unreachable for a term already paid
+  through.
+- **Catch-up transaction boundary**: one transaction per month — grant month N and advance
+  `nextCreditAt` to N+1 together, then repeat. A run that dies after four of eight months keeps the
+  four and resumes at the fifth, where one transaction over the whole backlog would hold a wallet lock
+  across eight grants and lose all eight to a failure on the last.
+- **The service principal is a separate request property**, not a variant of `request.user`.
+  `InternalKeyGuard` sets `request.service`, `@CurrentUser()` keeps reading `request.user` and so
+  resolves to nothing on an internal route — there is no expression that yields a user id there, which
+  is what "unrepresentable in the type" buys. `AuthenticatedUser` and `RolesGuard` are untouched.
+- **Both internal routes answer with a count summary**, not `204`. A second run asserting zero grants
+  is the ticket's own idempotency claim, and reading it from the response beats counting rows.
+
+## Do not build a claim sweep here
+
+Ticket 023's `FOR UPDATE SKIP LOCKED` lease exists because provisioning calls Stripe and must not hold
+locks across the network. **This routine touches no network**, so it needs none of that: the wallet
+lock inside `CreditService.allocate` serialises concurrent runs, and the duplicate is answered by
+`findAllocation` on the month key, which replays instead of granting. Two runs racing one subscription
+converge — they compute the same `nextCreditAt` from the same anchor and write the same value. Copying
+023's claim-then-work shape by analogy would add a lease with nothing to protect.
 
 ## Requirement clauses closed
 

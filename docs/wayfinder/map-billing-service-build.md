@@ -326,6 +326,29 @@ covered the table has served its purpose and can retire in favour of the specs.
   `incremental` made `npm run build` emit **nothing** on every run after the first, exit code 0, and
   `dist/` empty; `incremental` has since been dropped.
 
+- [028 Build the annual allocation cron and the internal endpoints](tickets/028-build-annual-allocation-cron.md)
+  — shipped through OpenSpec change `build-annual-allocation-cron`; behaviour in
+  [`annual-allocation`](../../openspec/specs/annual-allocation/spec.md). **The claim lease was not
+  built and must not be**: ticket 023's `SKIP LOCKED` exists because provisioning calls Stripe, and
+  this routine reaches no network, so `CreditService.allocate`'s wallet lock plus the month key
+  already serialise concurrent runs — two runs racing one subscription compute the same
+  `nextCreditAt` from the same anchor and write the same value. Copying 023 by analogy would add a
+  lease with nothing to protect. **`InternalKeyGuard` and the service principal live in
+  `common/identity/`, not `auth/`** — `AuthModule` imports `BillingModule`, so a billing controller
+  importing a guard from auth closes a cycle; the same constraint ticket 021 hit. The principal is a
+  **separate request property**, so `@CurrentUser()` resolves to nothing on an internal route and no
+  expression there yields a user id. `@InternalOnly()` composes `@Public()` with the guard in one
+  decorator, because a public route that later loses its `@UseGuards` line is open with no error
+  anywhere. Found by test: **`forbidNonWhitelisted` does fire on a DTO with no decorated
+  properties**, so an empty request DTO makes "rejects act-on-behalf-of" assertable — a route with no
+  `@Body()` would answer 200 and silently ignore a `userId`. Also **`CREDIT_ALLOCATION_CRON` had sat
+  in `.env` since ticket 009 with nothing reading it**; this is its first caller, moved to an
+  `allocation` namespace. 6 new tests, 186 total.
+- **A trap found while closing 028, not fixed:** `package.json` has
+  `"format": "prettier --write \"src/**/*.ts\""` and `.prettierrc` declares no `printWidth`, so
+  Prettier runs at its default 80 while the code is written at 100. Anyone running `npm run format`
+  reflows all of `src/`. Setting `"printWidth": 100` closes it; left for whoever decides it.
+
 ## Not yet specified
 
 - **Observability**: the logging approach for Stripe reconciliation. Narrower than it was — ticket
@@ -398,7 +421,6 @@ pre-merge ticket and should be read at its successor above.
 
 Frontier (open, unblocked, unclaimed):
 
-- [028 Build the annual allocation cron and the internal endpoints](tickets/028-build-annual-allocation-cron.md) — task — unblocked by 026
 - [029 Build the plan and add-on catalog, price changes, and subscriber migration](tickets/029-build-plan-catalog-admin.md) — task — unblocked by 020 — merges the old 030
 - [033 Build billing history](tickets/033-build-billing-history.md) — task — unblocked by 026
 - [035 Decide whether imports use the `@/` path alias](tickets/035-decide-import-path-alias.md) — task — cheapest while only twelve files exist
@@ -440,5 +462,6 @@ Closed:
 - [022 Build the credit ledger: allocation, adjustment, and wallet freeze](tickets/022-build-credit-allocation-and-freeze.md) — task — OpenSpec change `build-credit-allocation-and-freeze`, archived; the four remaining Section 6 clauses
 - [023 Build registration provisioning and the Stripe sync reconciler](tickets/023-build-registration-provisioning.md) — task — OpenSpec change `build-registration-provisioning`, archived; capability spec [`subscription-provisioning`](../../openspec/specs/subscription-provisioning/spec.md); three Section 3 clauses, the internal key deferred to 028
 - [024 Build webhook ingestion and the queue worker](tickets/024-build-webhook-ingestion-and-worker.md) — task — OpenSpec change `build-webhook-ingestion-and-worker`, archived; capability spec [`webhook-pipeline`](../../openspec/specs/webhook-pipeline/spec.md); three Section 5 clauses and one Section 10
-- [026 Build the webhook handlers: subscriptions, invoices, and the ordering guarantees](tickets/026-build-webhook-handlers.md) — task — merges the old 027; two OpenSpec changes, `build-webhook-subscription-handlers` and `build-webhook-invoice-handlers`, both archived; capability spec [`webhook-handlers`](../../openspec/specs/webhook-handlers/spec.md); six Section 5 clauses and five Section 6
+- [026 Build the webhook handlers: subscriptions, invoices, and the ordering guarantees](tickets/026-build-webhook-handlers.md) — task — merges the old 027; two OpenSpec changes, `build-webhook-subscription-handlers` and `build-webhook-invoice-handlers`, both archived; capability spec [`webhook-handlers`](../../openspec/specs/webhook-handlers/spec.md); six Section 5 clauses and five Section 6. **Corrected 2026-08-10 while preparing 028**: `nextCreditAt` advanced with `setUTCMonth(+1)` off `period.start`, which overflows a short month — an annual term starting 31 January dated the next credit at 3 March, so February's allocation key was never minted. The arithmetic moved to `src/billing/services/credit-schedule.ts`, **anchored on the day-of-month of `paidThroughAt` rather than chained off the previous value**, because chaining drifts backwards and grants a thirteenth month inside a twelve-month term. Recorded in [028](tickets/028-build-annual-allocation-cron.md), which calls that one function and mints no key of its own
+- [028 Build the annual allocation cron and the internal endpoints](tickets/028-build-annual-allocation-cron.md) — task — OpenSpec change `build-annual-allocation-cron`, archived; capability spec [`annual-allocation`](../../openspec/specs/annual-allocation/spec.md); three Section 3 clauses and the two Section 9 internal-key clauses, deferred 020 → 023 → here
 - [025 Build the subscription lifecycle state machine](tickets/025-build-subscription-lifecycle.md) — task — OpenSpec change `build-subscription-lifecycle`, archived; capability spec [`subscription-lifecycle`](../../openspec/specs/subscription-lifecycle/spec.md); two Section 3 clauses, two Section 4, one Section 6 taken over from 027, one Section 10

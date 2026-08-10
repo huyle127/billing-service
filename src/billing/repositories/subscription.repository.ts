@@ -7,7 +7,7 @@ import {
   SubscriptionStatus,
 } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { PENDING_SYNC_STATUSES } from '../billing.constants';
+import { CREDITABLE_STATUSES, PENDING_SYNC_STATUSES } from '../billing.constants';
 
 export interface NewFreeSubscription {
   userId: string;
@@ -58,7 +58,7 @@ export interface NewSubscriptionEvent {
   occurredAt: Date;
 }
 
-export type PendingSubscription = Prisma.SubscriptionGetPayload<{ include: { plan: true } }>;
+export type SubscriptionWithPlan = Prisma.SubscriptionGetPayload<{ include: { plan: true } }>;
 
 const PENDING_SYNC_SQL = Prisma.raw(
   PENDING_SYNC_STATUSES.map((status) => `'${status}'`).join(', '),
@@ -112,7 +112,7 @@ export class SubscriptionRepository {
     await tx.subscriptionEvent.create({ data: event });
   }
 
-  findPendingByUserId(userId: string): Promise<PendingSubscription | null> {
+  findPendingByUserId(userId: string): Promise<SubscriptionWithPlan | null> {
     return this.prisma.subscription.findFirst({
       where: {
         userId,
@@ -121,6 +121,27 @@ export class SubscriptionRepository {
       },
       include: { plan: true },
       orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async advanceNextCreditAt(
+    tx: Prisma.TransactionClient,
+    id: string,
+    nextCreditAt: Date,
+  ): Promise<void> {
+    await tx.subscription.update({ where: { id }, data: { nextCreditAt } });
+  }
+
+  findDueForCredit(now: Date, batchSize: number): Promise<SubscriptionWithPlan[]> {
+    return this.prisma.subscription.findMany({
+      where: {
+        cycle: BillingCycle.ANNUAL,
+        status: { in: [...CREDITABLE_STATUSES] },
+        nextCreditAt: { lte: now, lt: this.prisma.subscription.fields.paidThroughAt },
+      },
+      include: { plan: true },
+      orderBy: { nextCreditAt: 'asc' },
+      take: batchSize,
     });
   }
 

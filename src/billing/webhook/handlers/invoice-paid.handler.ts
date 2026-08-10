@@ -5,6 +5,7 @@ import { ALLOCATION_REASONS, TRANSITION_REASONS } from '../../billing.constants'
 import { PaymentTransactionRepository } from '../../repositories/payment-transaction.repository';
 import { PlanRepository } from '../../repositories/plan.repository';
 import { SubscriptionRepository } from '../../repositories/subscription.repository';
+import { nextCreditAt } from '../../services/credit-schedule';
 import { SubscriptionAllocationService } from '../../services/subscription-allocation.service';
 import { SubscriptionLifecycleService } from '../../services/subscription-lifecycle.service';
 import { LIFECYCLE_EVENTS, UNCHANGED } from '../../services/subscription-transitions';
@@ -78,7 +79,7 @@ export class InvoicePaidHandler extends WebhookHandler {
       paidThroughAt: period.end,
       nextCreditAt:
         synced.local.cycle === BillingCycle.ANNUAL
-          ? this.reading.nextCreditAt(period)
+          ? nextCreditAt(period.start, period.end)
           : undefined,
     });
 

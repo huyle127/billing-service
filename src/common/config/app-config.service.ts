@@ -17,8 +17,12 @@ export class AppConfigService {
     return this.config.getOrThrow<string>('app.internalApiKey');
   }
 
-  get creditAllocationCron(): string {
-    return this.config.getOrThrow<string>('app.creditAllocationCron');
+  get allocationCron(): string {
+    return this.config.getOrThrow<string>('allocation.cron');
+  }
+
+  get allocationBatchSize(): number {
+    return this.config.getOrThrow<number>('allocation.batchSize');
   }
 
   get databaseUrl(): string {

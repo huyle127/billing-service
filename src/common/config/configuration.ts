@@ -33,7 +33,11 @@ export const appConfig = registerAs('app', () => ({
   nodeEnv: optional('NODE_ENV', 'development'),
   port: integer('PORT', 3000),
   internalApiKey: required('INTERNAL_API_KEY'),
-  creditAllocationCron: optional('CREDIT_ALLOCATION_CRON', '0 3 * * *'),
+}));
+
+export const allocationConfig = registerAs('allocation', () => ({
+  cron: optional('CREDIT_ALLOCATION_CRON', '0 3 * * *'),
+  batchSize: integer('CREDIT_ALLOCATION_BATCH_SIZE', 50),
 }));
 
 export const databaseConfig = registerAs('database', () => ({
@@ -62,6 +66,7 @@ export const provisioningConfig = registerAs('provisioning', () => ({
 
 export const configurations = [
   appConfig,
+  allocationConfig,
   databaseConfig,
   authConfig,
   stripeConfig,

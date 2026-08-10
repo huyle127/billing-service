@@ -8,6 +8,10 @@ import { BillingCustomerRepository } from './repositories/billing-customer.repos
 import { PaymentTransactionRepository } from './repositories/payment-transaction.repository';
 import { PlanRepository } from './repositories/plan.repository';
 import { SubscriptionRepository } from './repositories/subscription.repository';
+import { InternalKeyGuard } from '../common/identity/internal-key.guard';
+import { InternalController } from './controllers/internal.controller';
+import { AnnualAllocationSchedulerService } from './services/annual-allocation-scheduler.service';
+import { AnnualAllocationService } from './services/annual-allocation.service';
 import { EntitlementService } from './services/entitlement.service';
 import { ProvisioningSchedulerService } from './services/provisioning-scheduler.service';
 import { ProvisioningService } from './services/provisioning.service';
@@ -24,7 +28,11 @@ import { StripeModule } from './stripe/stripe.module';
     UserModule,
     ScheduleModule.forRoot(),
   ],
+  controllers: [InternalController],
   providers: [
+    AnnualAllocationService,
+    AnnualAllocationSchedulerService,
+    InternalKeyGuard,
     EntitlementService,
     ProvisioningService,
     ProvisioningSchedulerService,

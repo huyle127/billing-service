@@ -31,8 +31,8 @@ export class ProvisioningSchedulerService implements OnModuleInit, OnModuleDestr
     this.schedule.deleteInterval(PROVISIONING_SWEEP);
   }
 
-  private sweep(): Promise<void> {
-    return this.provisioning.sweep().catch((error: unknown) => {
+  private async sweep(): Promise<void> {
+    await this.provisioning.sweep().catch((error: unknown) => {
       this.logger.error(
         `The provisioning sweep failed: ${error instanceof Error ? error.message : String(error)}`,
       );

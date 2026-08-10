@@ -9,9 +9,13 @@ import { StripeCustomer } from '../stripe/types/stripe.types';
 import { BillingCustomerRepository } from '../repositories/billing-customer.repository';
 import {
   ClaimedSubscription,
-  PendingSubscription,
+  SubscriptionWithPlan,
   SubscriptionRepository,
 } from '../repositories/subscription.repository';
+
+export interface SweepSummary {
+  subscriptions: number;
+}
 
 function reasonOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -36,7 +40,7 @@ export class ProvisioningService {
     await this.ensureStripeSubscription(userId, customerId);
   }
 
-  async sweep(): Promise<void> {
+  async sweep(): Promise<SweepSummary> {
     const claimedAt = this.clock.now();
     const claimed = await this.subscriptions.claimPending(
       claimedAt,
@@ -51,6 +55,8 @@ export class ProvisioningService {
         this.logger.warn(`Provisioning subscription ${row.id} failed: ${reasonOf(error)}`);
       });
     }
+
+    return { subscriptions: claimed.length };
   }
 
   private async ensureStripeCustomer(userId: string): Promise<string> {
@@ -117,7 +123,7 @@ export class ProvisioningService {
   }
 
   private recordSubscriptionFailure(
-    subscription: PendingSubscription,
+    subscription: SubscriptionWithPlan,
     error: unknown,
   ): Promise<void> {
     return this.subscriptions.recordFailure(

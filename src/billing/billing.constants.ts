@@ -19,7 +19,14 @@ export const PENDING_SYNC_STATUSES = [
   SubscriptionStatus.PAST_DUE,
 ] as const;
 
+export const CREDITABLE_STATUSES = [
+  SubscriptionStatus.ACTIVE,
+  SubscriptionStatus.CANCELED,
+] as const;
+
 export const PROVISIONING_SWEEP = 'provisioning.sweep';
+
+export const ANNUAL_ALLOCATION_SWEEP = 'allocation.annual';
 
 export const ALLOCATION_KEYS = {
   month: (subscriptionId: string, at: Date): string =>
@@ -29,6 +36,7 @@ export const ALLOCATION_KEYS = {
 export const ALLOCATION_REASONS = {
   registration: 'registration',
   invoicePaid: 'invoice_paid',
+  annualCron: 'annual_cron',
 } as const;
 
 export const TRANSITION_REASONS = {

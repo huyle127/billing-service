@@ -35,11 +35,4 @@ export class InvoiceReadingService {
     return invoice.periodStart ? { start: invoice.periodStart, end: invoice.periodEnd } : null;
   }
 
-  nextCreditAt(period: InvoicePeriod): Date {
-    const next = new Date(period.start);
-
-    next.setUTCMonth(next.getUTCMonth() + 1);
-
-    return next;
-  }
 }
