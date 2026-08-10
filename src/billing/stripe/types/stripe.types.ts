@@ -57,9 +57,11 @@ export interface StripeInvoice {
   customerId: string | null;
   subscriptionId: string | null;
   status: string | null;
+  billingReason: string | null;
   amountDue: number;
   amountPaid: number;
   currency: string;
+  periodStart: Date | null;
   periodEnd: Date | null;
   metadata: StripeMetadata;
 }

@@ -152,6 +152,7 @@ model Subscription {
   stripeSubscriptionId String?
   stripePriceId        String?
   stripeStatus         String?
+  stripePeriodEnd      DateTime?
   syncAttempts         Int                @default(0)
   syncNextAttemptAt    DateTime           @default(now())
   syncError            String?

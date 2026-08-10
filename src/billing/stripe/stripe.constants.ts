@@ -52,6 +52,12 @@ export const INVOICE_STATUSES = {
   paid: 'paid',
 } as const;
 
+export const BILLING_REASONS = {
+  subscriptionCreate: 'subscription_create',
+  subscriptionCycle: 'subscription_cycle',
+  subscriptionUpdate: 'subscription_update',
+} as const;
+
 export const PAYMENT_STATUSES = {
   succeeded: 'succeeded',
 } as const;

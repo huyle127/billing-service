@@ -81,3 +81,22 @@ listening is that `npm run build` silently emits nothing on any run after the fi
 deletes `dist/`, tsc reads `tsconfig.build.tsbuildinfo`, concludes nothing changed, and skips the
 emit. Exit code 0, empty `dist/`. Deleting the tsbuildinfo fixes the run; the standing fix is to
 drop one of the two settings.
+
+## Post-dunning behaviour recorded — 2026-08-10
+
+Ticket 013 asked for this setting to be captured here and it never was. Found while proposing ticket
+026, which is where it starts to matter.
+
+**Dashboard → Billing → Automatic collection → "If all retries for a payment fail" is to be set to
+`Cancel subscription`.** It is account-wide configuration with no API to read or write it, so it is
+recorded here rather than asserted by a test.
+
+The choice is forced by the lifecycle we own. `expire` is the transition that forfeits subscription
+credits and creates the replacement Free subscription, and the only thing that drives it is
+`customer.subscription.deleted`. Left on `unpaid`, Stripe emits no such event: the subscription keeps
+generating invoices, our row sits in `PAST_DUE` for good, and — until ticket 026 widened the unfreeze
+to every edge leaving `PAST_DUE` — the wallet would have stayed `FROZEN` with nothing able to thaw
+it. `Cancel subscription` is the one value that makes `PAST_DUE → EXPIRED` reachable.
+
+Nothing in the code reads it: ticket 013's ownership model means the setting cannot alter our
+lifecycle silently, only starve it of the event that ends one.

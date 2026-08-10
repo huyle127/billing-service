@@ -382,9 +382,11 @@ export class StripeSdkAdapter extends StripeService {
       customerId: this.toId(invoice.customer),
       subscriptionId: this.toId(subscription),
       status: invoice.status,
+      billingReason: invoice.billing_reason,
       amountDue: invoice.amount_due,
       amountPaid: invoice.amount_paid,
       currency: invoice.currency,
+      periodStart: new Date(invoice.period_start * 1000),
       periodEnd: new Date(invoice.period_end * 1000),
       metadata: this.toMetadata(invoice.metadata),
     };

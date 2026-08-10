@@ -21,7 +21,7 @@ describe('the subscription transition table', () => {
   it('carries these edges and answers unchanged for every other pair', () => {
     expect(wholeTable()).toEqual({
       'PENDING + activate': 'ACTIVE records CREATED',
-      'PENDING + renew': UNCHANGED,
+      'PENDING + renew': 'ACTIVE records CREATED',
       'PENDING + cancel': UNCHANGED,
       'PENDING + pastDue': UNCHANGED,
       'PENDING + expire': 'EXPIRED records EXPIRED',

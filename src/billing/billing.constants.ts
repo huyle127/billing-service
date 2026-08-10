@@ -10,6 +10,8 @@ export const REGISTRATION_TRANSACTION = LEDGER_TRANSACTION;
 
 export const LIFECYCLE_TRANSACTION = LEDGER_TRANSACTION;
 
+export const WEBHOOK_TRANSACTION = LEDGER_TRANSACTION;
+
 export const PENDING_SYNC_STATUSES = [
   SubscriptionStatus.PENDING,
   SubscriptionStatus.ACTIVE,
@@ -26,6 +28,7 @@ export const ALLOCATION_KEYS = {
 
 export const ALLOCATION_REASONS = {
   registration: 'registration',
+  invoicePaid: 'invoice_paid',
 } as const;
 
 export const TRANSITION_REASONS = {

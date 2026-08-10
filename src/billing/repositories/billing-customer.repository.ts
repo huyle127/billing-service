@@ -14,8 +14,26 @@ export class BillingCustomerRepository {
     return this.prisma.billingCustomer.findUnique({ where: { userId } });
   }
 
+  findByUserIdWithin(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<BillingCustomer | null> {
+    return tx.billingCustomer.findUnique({ where: { userId } });
+  }
+
   async attachStripeCustomer(id: string, stripeCustomerId: string): Promise<void> {
     await this.prisma.billingCustomer.update({
+      where: { id },
+      data: { stripeCustomerId, syncAttempts: 0, syncError: null },
+    });
+  }
+
+  async attachStripeCustomerWithin(
+    tx: Prisma.TransactionClient,
+    id: string,
+    stripeCustomerId: string,
+  ): Promise<void> {
+    await tx.billingCustomer.update({
       where: { id },
       data: { stripeCustomerId, syncAttempts: 0, syncError: null },
     });

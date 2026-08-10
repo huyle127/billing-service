@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Clock } from '../../../common/clock/clock';
 import {
   BILLING_MODES,
+  BILLING_REASONS,
   IDEMPOTENCY_KEYS,
   INVOICE_STATUSES,
   METADATA_KEYS,
@@ -74,6 +75,20 @@ export class FakeStripeAdapter extends StripeService {
 
   expireIdempotencyKeys(): void {
     this.idempotency.clear();
+  }
+
+  issueInvoiceFor(subscriptionId: string, overrides: Partial<StripeInvoice> = {}): StripeInvoice {
+    const subscription = this.require(this.subscriptions.get(subscriptionId), 'subscription');
+    const price = subscription.priceId ? this.prices.get(subscription.priceId) : undefined;
+    const invoice: StripeInvoice = {
+      ...this.issueInvoice(subscription.customerId, price),
+      subscriptionId,
+      ...overrides,
+    };
+
+    this.invoices.set(invoice.id, invoice);
+
+    return invoice;
   }
 
   signPayload(payload: Record<string, unknown>): { rawBody: Buffer; signature: string } {
@@ -394,9 +409,11 @@ export class FakeStripeAdapter extends StripeService {
       customerId,
       subscriptionId: null,
       status: INVOICE_STATUSES.paid,
+      billingReason: BILLING_REASONS.subscriptionCreate,
       amountDue: amount,
       amountPaid: amount,
       currency: price?.currency ?? 'usd',
+      periodStart: this.clock.now(),
       periodEnd: this.periodEnd(price?.interval ?? 'month'),
       metadata: {},
     };

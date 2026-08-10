@@ -5,6 +5,7 @@ import { PrismaModule } from '../common/prisma/prisma.module';
 import { CreditModule } from '../credit/credit.module';
 import { UserModule } from '../user/user.module';
 import { BillingCustomerRepository } from './repositories/billing-customer.repository';
+import { PaymentTransactionRepository } from './repositories/payment-transaction.repository';
 import { PlanRepository } from './repositories/plan.repository';
 import { SubscriptionRepository } from './repositories/subscription.repository';
 import { EntitlementService } from './services/entitlement.service';
@@ -30,6 +31,7 @@ import { StripeModule } from './stripe/stripe.module';
     SubscriptionAllocationService,
     SubscriptionLifecycleService,
     PlanRepository,
+    PaymentTransactionRepository,
     BillingCustomerRepository,
     SubscriptionRepository,
   ],
@@ -38,6 +40,10 @@ import { StripeModule } from './stripe/stripe.module';
     ProvisioningService,
     SubscriptionAllocationService,
     SubscriptionLifecycleService,
+    PlanRepository,
+    PaymentTransactionRepository,
+    BillingCustomerRepository,
+    SubscriptionRepository,
   ],
 })
 export class BillingModule {}

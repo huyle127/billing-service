@@ -43,7 +43,7 @@ export class SubscriptionLifecycleService {
     );
   }
 
-  private async applyWithin(
+  async applyWithin(
     tx: Prisma.TransactionClient,
     request: TransitionRequest,
   ): Promise<TransitionOutcome> {
@@ -106,10 +106,7 @@ export class SubscriptionLifecycleService {
       return;
     }
 
-    if (
-      subscription.status === SubscriptionStatus.PAST_DUE &&
-      transition.to === SubscriptionStatus.ACTIVE
-    ) {
+    if (subscription.status === SubscriptionStatus.PAST_DUE) {
       await this.credit.unfreeze(tx, subscription.userId);
     }
   }

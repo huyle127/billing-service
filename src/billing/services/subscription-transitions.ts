@@ -34,12 +34,18 @@ const RENEWS: AppliedTransition = {
   records: SubscriptionEventType.RENEWED,
 };
 
+const ACTIVATES: AppliedTransition = {
+  to: SubscriptionStatus.ACTIVE,
+  records: SubscriptionEventType.CREATED,
+};
+
 const TRANSITIONS: Record<
   SubscriptionStatus,
   Partial<Record<LifecycleEvent, AppliedTransition>>
 > = {
   [SubscriptionStatus.PENDING]: {
-    activate: { to: SubscriptionStatus.ACTIVE, records: SubscriptionEventType.CREATED },
+    activate: ACTIVATES,
+    renew: ACTIVATES,
     expire: EXPIRES,
   },
   [SubscriptionStatus.ACTIVE]: {

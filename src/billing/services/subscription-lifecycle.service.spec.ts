@@ -195,6 +195,34 @@ describe('the subscription lifecycle', () => {
     ).toBe(0);
   });
 
+  it('leaves the wallet spendable when dunning gives up on a past due subscription', async () => {
+    const subscription = await aSubscriber(SubscriptionStatus.PAST_DUE);
+
+    await prisma.creditWallet.update({
+      where: { userId: subscription.userId },
+      data: { status: 'FROZEN' },
+    });
+
+    const outcome = await lifecycle.apply({
+      subscriptionId: subscription.id,
+      event: LIFECYCLE_EVENTS.expire,
+      reason: TRANSITION_REASONS.expired,
+      stripeEventId: 'evt_dunning_gave_up',
+    });
+
+    expect(outcome).toBe(APPLIED);
+    expect(await reload(subscription)).toMatchObject({ status: 'EXPIRED' });
+    expect(await wallet(subscription)).toMatchObject({
+      status: 'ACTIVE',
+      subscriptionCredits: 0,
+    });
+    expect(
+      await prisma.subscription.count({
+        where: { userId: subscription.userId, status: 'ACTIVE' },
+      }),
+    ).toBe(1);
+  });
+
   it('expires by forfeiting subscription credits and replacing the row with a Free subscription', async () => {
     const subscription = await aSubscriber(SubscriptionStatus.ACTIVE);
     const free = await freePlan();

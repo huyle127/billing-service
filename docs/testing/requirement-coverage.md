@@ -43,13 +43,13 @@ Status: `covered` · `partial` · `todo`
 | Ingestion is idempotent by Stripe event id | `webhook-http: skips a redelivered completed event and leaves exactly one row` | covered |
 | Failed events are answered non-2xx so Stripe redelivers | `webhook-http: answers non-2xx and records the reason when a handler fails` · `webhook-http: processes a redelivered failed event again` | covered |
 | An abandoned event stays on record with its failure reason | `webhook-http: answers non-2xx and records the reason when a handler fails` | covered |
-| Processing never assumes event ordering | | todo |
-| Handlers re-fetch the object rather than trusting the payload | | todo |
-| Period-derived state advances monotonically | | todo |
-| An event whose subject is missing defers rather than failing | `webhook-http: records a deferral distinguishably from a failure` | partial — the pipeline records a deferral as its own outcome; no handler defers on a real missing subject until 026 |
+| Processing never assumes event ordering | `webhook-subscriptions: converges on the same rows whether the history arrives in order or shuffled` | covered |
+| Handlers re-fetch the object rather than trusting the payload | `webhook-subscriptions: applies the price Stripe holds over the one the payload carries, and allocates nothing` | covered |
+| Period-derived state advances monotonically | `webhook-subscriptions: leaves everything alone when the event resolves to a superseded period` | covered |
+| An event whose subject is missing defers rather than failing | `webhook-subscriptions: defers an event whose subject has no local row, and writes no subscription` · `webhook-http: records a deferral distinguishably from a failure` | covered |
 | A redelivered event is judged by its recorded status, not its existence | `webhook-http: processes a redelivered failed event again` · `webhook-http: skips a redelivered completed event and leaves exactly one row` | covered |
-| Replaying full history converges on the ordered result | | todo |
-| Webhooks never create domain rows | | todo |
+| Replaying full history converges on the ordered result | `webhook-subscriptions: converges on the same rows whether the history arrives in order or shuffled` | covered |
+| Webhooks never create domain rows | `webhook-subscriptions: defers an event whose subject has no local row, and writes no subscription` · `webhook-subscriptions: attaches the Stripe id once, however often the created event is delivered` | covered |
 
 ## Section 6 — Credits
 
@@ -65,15 +65,15 @@ Status: `covered` · `partial` · `todo`
 | A consumption can be reversed at most once | `ledger-invariants: a consumption can be reversed at most once; credit.service: replays the first reversal` | covered |
 | Declines report `INSUFFICIENT_CREDITS` and `BILLING_FROZEN` distinctly | `credit.service: declines a shortfall and a frozen wallet distinctly; credit-http: reports a decline as a 200 carrying no transactions` | covered |
 | A decline emits a metric | `credit.service: counts every decline by reason / counts nothing for a transaction that rolled back` | covered |
-| Wallet freezes when a subscription goes past due | `subscription-lifecycle.service: freezes the wallet on past due and unfreezes on resolution, allocating nothing either way` | covered |
-| Resolving past due unfreezes and allocates the next period | | todo |
+| Wallet freezes when a subscription goes past due | `subscription-lifecycle.service: freezes the wallet on past due and unfreezes on resolution, allocating nothing either way` · `subscription-lifecycle.service: leaves the wallet spendable when dunning gives up on a past due subscription` | covered |
+| Resolving past due unfreezes and allocates the next period | `webhook-invoices: freezes on a failed payment and thaws on the retry, leaving one payment record` | covered |
 | Add-on credits survive a freeze and never expire | `credit.service: takes nothing and records nothing when a wallet is frozen / refuses a draw the add-on ledger could satisfy, and allows it again once unfrozen / changes nothing when a frozen wallet is frozen or an active one unfrozen` | covered |
 | A freeze gates consumption only — allocation, adjustment and reset still apply | `credit.service: lets a frozen wallet be allocated to, adjusted, and reset` | covered |
 | Expiry forfeits what the subscription ledger still holds | `credit.service: forfeits what the subscription ledger holds and leaves add-on standing / writes no row when there is nothing left to forfeit` | covered |
-| Allocation grants on `subscription_create`, `_cycle`, and `_update` only | | todo |
-| Payment detected via `invoice.status`, never the removed `paid` field | | todo |
-| Free tier allocates monthly from `invoice.paid` with no separate cron | | todo |
-| A mid-cycle plan change grants a full new monthly allocation | | todo |
+| Allocation grants on `subscription_create`, `_cycle`, and `_update` only | `webhook-invoices: grants on a cycle invoice and nothing at all on a manual one` | covered |
+| Payment detected via `invoice.status`, never the removed `paid` field | `webhook-invoices: writes nothing at all for an invoice Stripe has not marked paid` | covered |
+| Free tier allocates monthly from `invoice.paid` with no separate cron | `webhook-invoices: grants the Free plan its credits from a zero-amount invoice without recording a payment` | covered |
+| A mid-cycle plan change grants a full new monthly allocation | `webhook-invoices: grants on a cycle invoice and nothing at all on a manual one` · `webhook-invoices: grants once for one invoice even when it is redelivered in a later month` | covered |
 | Allocation is idempotent on subscription and month | `credit.service: grants nothing further for a repeated key and names the first row / grants twice for two keys the ledger cannot tell apart; ledger-invariants: an allocation key is spent once per ledger, as a consumption key is` | covered |
 | A renewal replaces subscription credits; unused credits do not roll over | `credit.service: lands a replacing grant on the plan amount and forfeits the remainder / does not zero a balance twice when a replacing grant is retried / adds a non-replacing grant, and refuses to replace the add-on ledger` | covered |
 | Admin adjustments target add-on credits only | `credit.service: credits and debits the add-on ledger alone, carrying the admin reason / refuses a debit larger than the add-on ledger and allows one down to zero / leaves the subscription ledger unreachable by any adjustment; credit-http: adjusts the wallet named in the path for an admin, and nobody else / refuses a malformed adjustment, a named ledger, and a debit the wallet cannot cover` | covered |

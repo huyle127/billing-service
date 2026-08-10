@@ -398,16 +398,15 @@ pre-merge ticket and should be read at its successor above.
 
 Frontier (open, unblocked, unclaimed):
 
-- [026 Build the webhook handlers: subscriptions, invoices, and the ordering guarantees](tickets/026-build-webhook-handlers.md) — task — unblocked by 025 — merges the old 027; split into two OpenSpec changes at propose time
+- [028 Build the annual allocation cron and the internal endpoints](tickets/028-build-annual-allocation-cron.md) — task — unblocked by 026
 - [029 Build the plan and add-on catalog, price changes, and subscriber migration](tickets/029-build-plan-catalog-admin.md) — task — unblocked by 020 — merges the old 030
+- [033 Build billing history](tickets/033-build-billing-history.md) — task — unblocked by 026
 - [035 Decide whether imports use the `@/` path alias](tickets/035-decide-import-path-alias.md) — task — cheapest while only twelve files exist
 
 Blocked:
 
-- [028 Build the annual allocation cron and the internal endpoints](tickets/028-build-annual-allocation-cron.md) — task — 026
-- [031 Build subscription self-service and payment methods](tickets/031-build-subscription-self-service.md) — task — 023, 025, 029, 034
-- [032 Build add-on credit purchase](tickets/032-build-addon-purchase.md) — task — 026, 029, 031
-- [033 Build billing history](tickets/033-build-billing-history.md) — task — 021, 025, 026
+- [031 Build subscription self-service and payment methods](tickets/031-build-subscription-self-service.md) — task — 029
+- [032 Build add-on credit purchase](tickets/032-build-addon-purchase.md) — task — 029, 031
 
 Every build ticket names the requirement clauses it closes. Between them tickets 018–033 account for
 all 54 clauses still marked `todo` in
@@ -441,4 +440,5 @@ Closed:
 - [022 Build the credit ledger: allocation, adjustment, and wallet freeze](tickets/022-build-credit-allocation-and-freeze.md) — task — OpenSpec change `build-credit-allocation-and-freeze`, archived; the four remaining Section 6 clauses
 - [023 Build registration provisioning and the Stripe sync reconciler](tickets/023-build-registration-provisioning.md) — task — OpenSpec change `build-registration-provisioning`, archived; capability spec [`subscription-provisioning`](../../openspec/specs/subscription-provisioning/spec.md); three Section 3 clauses, the internal key deferred to 028
 - [024 Build webhook ingestion and the queue worker](tickets/024-build-webhook-ingestion-and-worker.md) — task — OpenSpec change `build-webhook-ingestion-and-worker`, archived; capability spec [`webhook-pipeline`](../../openspec/specs/webhook-pipeline/spec.md); three Section 5 clauses and one Section 10
+- [026 Build the webhook handlers: subscriptions, invoices, and the ordering guarantees](tickets/026-build-webhook-handlers.md) — task — merges the old 027; two OpenSpec changes, `build-webhook-subscription-handlers` and `build-webhook-invoice-handlers`, both archived; capability spec [`webhook-handlers`](../../openspec/specs/webhook-handlers/spec.md); six Section 5 clauses and five Section 6
 - [025 Build the subscription lifecycle state machine](tickets/025-build-subscription-lifecycle.md) — task — OpenSpec change `build-subscription-lifecycle`, archived; capability spec [`subscription-lifecycle`](../../openspec/specs/subscription-lifecycle/spec.md); two Section 3 clauses, two Section 4, one Section 6 taken over from 027, one Section 10

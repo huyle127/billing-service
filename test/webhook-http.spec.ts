@@ -8,10 +8,15 @@ import { FakeStripeAdapter } from '../src/billing/stripe/adapters/fake-stripe.ad
 import { StripeService } from '../src/billing/stripe/interfaces/stripe-adapter.interface';
 import { STRIPE_API_VERSION } from '../src/billing/stripe/stripe.constants';
 import { signTestPayload } from '../src/billing/stripe/webhook-signature';
-import { SubscriptionTrialWillEndHandler } from '../src/billing/webhook/handlers/subscription-trial-will-end.handler';
-import { WebhookHandler, WebhookOutcome } from '../src/billing/webhook/handlers/webhook-handler.interface';
+import { CustomerCreatedHandler } from '../src/billing/webhook/handlers/customer-created.handler';
+import {
+  Resolution,
+  WebhookHandler,
+  WebhookOutcome,
+} from '../src/billing/webhook/handlers/webhook-handler.interface';
 import {
   OUTCOME_STATUSES,
+  RESOLVED,
   STRIPE_SIGNATURE_HEADER,
   WEBHOOK_EVENT_TYPES,
 } from '../src/billing/webhook/webhook.constants';
@@ -31,15 +36,19 @@ const UNSUBSCRIBED_TYPE = 'radar.early_fraud_warning.created';
 process.env.STRIPE_WEBHOOK_SECRET = `${DASHBOARD_SECRET},${CLI_SECRET}`;
 
 class ProgrammableHandler extends WebhookHandler {
-  readonly eventType = WEBHOOK_EVENT_TYPES.subscriptionTrialWillEnd;
+  readonly eventType = WEBHOOK_EVENT_TYPES.customerCreated;
 
   calls = 0;
   outcome: WebhookOutcome = { status: OUTCOME_STATUSES.completed };
 
-  handle(): Promise<WebhookOutcome> {
+  resolve(): Promise<Resolution> {
     this.calls += 1;
 
-    return Promise.resolve(this.outcome);
+    if (this.outcome.status !== OUTCOME_STATUSES.completed) {
+      return Promise.resolve(this.outcome);
+    }
+
+    return Promise.resolve({ status: RESOLVED, apply: () => Promise.resolve(this.outcome) });
   }
 }
 
@@ -62,7 +71,7 @@ describe('the Stripe webhook endpoint', () => {
     })
       .overrideProvider(StripeService)
       .useFactory({ factory: (clock: Clock) => new FakeStripeAdapter(clock), inject: [Clock] })
-      .overrideProvider(SubscriptionTrialWillEndHandler)
+      .overrideProvider(CustomerCreatedHandler)
       .useValue(handler)
       .compile();
 
@@ -87,7 +96,7 @@ describe('the Stripe webhook endpoint', () => {
     handler.outcome = { status: OUTCOME_STATUSES.completed };
   });
 
-  function anEvent(type: string = WEBHOOK_EVENT_TYPES.subscriptionTrialWillEnd): string {
+  function anEvent(type: string = WEBHOOK_EVENT_TYPES.customerCreated): string {
     return JSON.stringify({
       id: `evt_${crypto.randomUUID().replace(/-/g, '')}`,
       object: 'event',

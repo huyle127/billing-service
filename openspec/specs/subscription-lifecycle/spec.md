@@ -65,13 +65,17 @@ enters it.
 ### Requirement: Past due freezes the wallet, resolution unfreezes it
 
 The service SHALL freeze the user's credit wallet in the transaction that moves a subscription
-to `PAST_DUE`, and unfreeze it in the transaction that moves it back to `ACTIVE`. Resolution
-SHALL NOT allocate credits.
+to `PAST_DUE`, and unfreeze it in every transaction that moves it out of `PAST_DUE`, whatever
+the destination. Neither SHALL allocate credits.
 
 #### Scenario: A renewal payment fails and is then paid
 - **WHEN** an active subscription goes past due and is later resolved
 - **THEN** the wallet is `FROZEN` while past due and `ACTIVE` afterwards, and no `ALLOCATION`
   transaction is written by either transition
+
+#### Scenario: Dunning gives up on a past due subscription
+- **WHEN** a past due subscription expires and is replaced by a Free subscription
+- **THEN** the wallet is `ACTIVE`, so the Free plan's next grant is spendable
 
 ### Requirement: Subscription credit allocation has one owner
 
@@ -83,3 +87,13 @@ same subscription and month SHALL allocate nothing further.
 - **WHEN** a user registers and the same subscription and month is granted a second time
 - **THEN** the wallet holds the Free plan's monthly credits and exactly one `ALLOCATION`
   transaction exists for that key
+
+### Requirement: The first paid invoice activates a pending subscription
+
+The transition table SHALL carry `PENDING + renew → ACTIVE` recording `CREATED`, so a caller
+requests the same transition whether a subscription is being activated or renewed, and no caller
+reads the stored status to decide which.
+
+#### Scenario: Payment authentication completes
+- **WHEN** a renew transition is applied to a `PENDING` subscription
+- **THEN** the row reads `ACTIVE` and one `SubscriptionEvent` of type `CREATED` exists for it

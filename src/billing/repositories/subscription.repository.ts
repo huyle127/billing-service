@@ -37,6 +37,19 @@ export interface StatusWrite {
   endedAt?: Date;
 }
 
+export interface StripeFieldWrite {
+  stripeSubscriptionId: string;
+  stripePriceId: string | null;
+  stripeStatus: string;
+  stripePeriodEnd?: Date;
+  planId?: string;
+}
+
+export interface BoundaryWrite {
+  paidThroughAt: Date | null;
+  nextCreditAt?: Date;
+}
+
 export interface NewSubscriptionEvent {
   subscriptionId: string;
   type: SubscriptionEventType;
@@ -72,6 +85,25 @@ export class SubscriptionRepository {
     tx: Prisma.TransactionClient,
     id: string,
     write: StatusWrite,
+  ): Promise<void> {
+    await tx.subscription.update({ where: { id }, data: write });
+  }
+
+  async writeStripeFields(
+    tx: Prisma.TransactionClient,
+    id: string,
+    write: StripeFieldWrite,
+  ): Promise<void> {
+    await tx.subscription.update({
+      where: { id },
+      data: { ...write, syncAttempts: 0, syncError: null },
+    });
+  }
+
+  async writeBoundaries(
+    tx: Prisma.TransactionClient,
+    id: string,
+    write: BoundaryWrite,
   ): Promise<void> {
     await tx.subscription.update({ where: { id }, data: write });
   }

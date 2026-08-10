@@ -2,11 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { WebhookStatus } from '@prisma/client';
 import { Clock } from '../../../common/clock/clock';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { WEBHOOK_TRANSACTION } from '../../billing.constants';
 import { StripeWebhookEvent } from '../../stripe/types/stripe.types';
 import { WebhookHandlerRegistry } from '../handlers/webhook-handler.registry';
-import { WebhookOutcome } from '../handlers/webhook-handler.interface';
+import { TransactionalWrite, WebhookOutcome } from '../handlers/webhook-handler.interface';
 import { WebhookEventRepository } from '../repositories/webhook-event.repository';
-import { OUTCOME_STATUSES, WEBHOOK_REASONS } from '../webhook.constants';
+import { OUTCOME_STATUSES, RESOLVED, WEBHOOK_REASONS } from '../webhook.constants';
 import { IncompleteOutcomeRollback } from '../webhook.errors';
 
 const COMPLETED: WebhookOutcome = { status: OUTCOME_STATUSES.completed };
@@ -36,14 +37,10 @@ export class WebhookService {
     if (!handler) return COMPLETED;
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        const outcome = await handler.handle(tx, event);
-        if (outcome.status !== OUTCOME_STATUSES.completed) {
-          throw new IncompleteOutcomeRollback(outcome);
-        }
+      const resolution = await handler.resolve(event);
+      if (resolution.status !== RESOLVED) return resolution;
 
-        return outcome;
-      });
+      return await this.write(resolution.apply);
     } catch (error) {
       if (error instanceof IncompleteOutcomeRollback) return error.outcome;
 
@@ -52,6 +49,17 @@ export class WebhookService {
         detail: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  private write(apply: TransactionalWrite): Promise<WebhookOutcome> {
+    return this.prisma.$transaction(async (tx) => {
+      const outcome = await apply(tx);
+      if (outcome.status !== OUTCOME_STATUSES.completed) {
+        throw new IncompleteOutcomeRollback(outcome);
+      }
+
+      return outcome;
+    }, WEBHOOK_TRANSACTION);
   }
 
   private markOutcome(id: string, outcome: WebhookOutcome): Promise<void> {

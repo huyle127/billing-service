@@ -3,7 +3,7 @@
 <!-- parent: map-billing-service-build.md -->
 <!-- label: wayfinder:task -->
 <!-- mode: AFK -->
-<!-- status: open -->
+<!-- status: closed -->
 <!-- assignee: -->
 <!-- output: src/billing/webhook/handlers/ -->
 <!-- blocked-by: 022, 024, 025 -->
@@ -83,11 +83,10 @@ converge regardless. This is where ticket 017's design becomes code.
 - **Recovery is driven by observing a successful payment**, not by Stripe returning the subscription to
   a particular status — Stripe's own past-due transition behaviour is a Dashboard setting that cannot
   be read at runtime. On resolution: unfreeze and allocate the next period.
-- **A past-due subscription that expires leaves the wallet frozen.** 025 shipped the unfreeze only on
-  `PAST_DUE → ACTIVE`, because that is the edge its spec names. `PAST_DUE → EXPIRED` therefore
-  downgrades to Free with a `FROZEN` wallet and nothing to thaw it — the next Free grant would land
-  in a wallet that cannot be spent. Decide here whether the unfreeze belongs on every edge leaving
-  `PAST_DUE` or only on the downgrade, and close it in the transition, not in a handler.
+- **The wallet unfreezes on every edge leaving `PAST_DUE`, whatever the destination — settled
+  2026-08-10** by the first change below. 025 had shipped the unfreeze only on `PAST_DUE → ACTIVE`,
+  because that was the edge its spec named, which left `PAST_DUE → EXPIRED` downgrading to Free with
+  a `FROZEN` wallet and nothing to thaw it. It is closed in the transition, not in a handler.
 
 ## The test that proves the rest
 
@@ -98,10 +97,17 @@ rarely emit are cheap to produce here. If that test passes, the ordering clauses
 passes in order, one of the guards above is missing.
 
 **This ticket does not fit one OpenSpec change under the ten-test ceiling.** It closes eleven clauses
-across two requirement sections. Prefer splitting it at propose time — the ordering guards and the
-subscription handlers first, the invoice path second — and let the second change extend the
-convergence test rather than write its own. Arguing the budget up in one proposal is the map's other
-sanctioned route, but it puts the money path and the ordering guards in one review.
+across two requirement sections, so it is split in two.
+
+- **`build-webhook-subscription-handlers` — implemented and archived 2026-08-10.** The handler contract
+  (`resolve` outside the transaction, `apply(tx)` inside it), the `stripePeriodEnd` marker and its
+  monotonic guard, the four subscription and customer handlers, and the shuffled-replay convergence
+  test over the subscription history. The trial handler was deleted here.
+- **`build-webhook-invoice-handlers` — implemented 2026-08-10.** The two invoice handlers, the
+  `billing_reason` grant rule, the period-keyed allocation, the paid-through and annual credit
+  boundaries, and the payment record. It extended the convergence test to the full history rather
+  than writing its own, which is the whole reason the two halves shared a ticket — and that test
+  immediately caught a paid invoice granting credits to an already-expired subscription.
 
 ## Inherited from the 2026-08-10 audit
 
