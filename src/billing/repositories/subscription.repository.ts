@@ -7,9 +7,13 @@ import {
   SubscriptionStatus,
 } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { CREDITABLE_STATUSES, PENDING_SYNC_STATUSES } from '../billing.constants';
+import {
+  CREDITABLE_STATUSES,
+  CURRENT_STATUSES,
+  PENDING_SYNC_STATUSES,
+} from '../billing.constants';
 
-export interface NewFreeSubscription {
+export interface NewSubscription {
   userId: string;
   planId: string;
   cycle: BillingCycle;
@@ -33,7 +37,7 @@ export interface ClaimedSubscription {
 export interface StatusWrite {
   status: SubscriptionStatus;
   stripeStatus?: string;
-  canceledAt?: Date;
+  canceledAt?: Date | null;
   endedAt?: Date;
 }
 
@@ -43,6 +47,11 @@ export interface StripeFieldWrite {
   stripeStatus: string;
   stripePeriodEnd?: Date;
   planId?: string;
+}
+
+export interface PendingChange {
+  pendingPlanId: string | null;
+  pendingCycle: BillingCycle | null;
 }
 
 export interface BoundaryWrite {
@@ -76,7 +85,7 @@ export class SubscriptionRepository {
 
   createFree(
     tx: Prisma.TransactionClient,
-    subscription: NewFreeSubscription,
+    subscription: NewSubscription,
   ): Promise<Subscription> {
     return tx.subscription.create({
       data: { ...subscription, status: SubscriptionStatus.ACTIVE },
@@ -85,6 +94,36 @@ export class SubscriptionRepository {
 
   findById(tx: Prisma.TransactionClient, id: string): Promise<Subscription | null> {
     return tx.subscription.findUnique({ where: { id } });
+  }
+
+  findCurrent(tx: Prisma.TransactionClient, userId: string): Promise<Subscription | null> {
+    return tx.subscription.findFirst({
+      where: { userId, status: { in: [...CURRENT_STATUSES] } },
+    });
+  }
+
+  findCurrentWithPlan(userId: string): Promise<SubscriptionWithPlan | null> {
+    return this.prisma.subscription.findFirst({
+      where: { userId, status: { in: [...CURRENT_STATUSES] } },
+      include: { plan: true },
+    });
+  }
+
+  findAwaitingPayment(userId: string): Promise<SubscriptionWithPlan | null> {
+    return this.prisma.subscription.findFirst({
+      where: { userId, status: SubscriptionStatus.PENDING },
+      include: { plan: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  createPending(
+    tx: Prisma.TransactionClient,
+    subscription: NewSubscription,
+  ): Promise<Subscription> {
+    return tx.subscription.create({
+      data: { ...subscription, status: SubscriptionStatus.PENDING },
+    });
   }
 
   async writeStatus(
@@ -103,6 +142,26 @@ export class SubscriptionRepository {
     await tx.subscription.update({
       where: { id },
       data: { ...write, syncAttempts: 0, syncError: null },
+    });
+  }
+
+  writePendingChange(
+    tx: Prisma.TransactionClient,
+    id: string,
+    change: PendingChange,
+  ): Promise<Subscription> {
+    return tx.subscription.update({ where: { id }, data: change });
+  }
+
+  settlePendingChange(
+    tx: Prisma.TransactionClient,
+    id: string,
+    planId: string,
+    cycle: BillingCycle,
+  ): Promise<Subscription> {
+    return tx.subscription.update({
+      where: { id },
+      data: { planId, cycle, pendingPlanId: null, pendingCycle: null },
     });
   }
 
@@ -126,6 +185,7 @@ export class SubscriptionRepository {
       WHERE s."status" = ${SubscriptionStatus.ACTIVE}::"SubscriptionStatus"
         AND s."stripeSubscriptionId" IS NOT NULL
         AND s."stripePriceId" IS NOT NULL
+        AND s."pendingPlanId" IS NULL
         AND s."stripePriceId" <> p."stripePriceId"
       ORDER BY s."id"
       LIMIT ${batchSize}

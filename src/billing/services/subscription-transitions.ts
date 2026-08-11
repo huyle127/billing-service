@@ -3,6 +3,7 @@ import { SubscriptionEventType, SubscriptionStatus } from '@prisma/client';
 export const LIFECYCLE_EVENTS = {
   activate: 'activate',
   renew: 'renew',
+  resume: 'resume',
   cancel: 'cancel',
   pastDue: 'pastDue',
   expire: 'expire',
@@ -34,6 +35,11 @@ const RENEWS: AppliedTransition = {
   records: SubscriptionEventType.RENEWED,
 };
 
+const RESUMES: AppliedTransition = {
+  to: SubscriptionStatus.ACTIVE,
+  records: SubscriptionEventType.RESUMED,
+};
+
 const ACTIVATES: AppliedTransition = {
   to: SubscriptionStatus.ACTIVE,
   records: SubscriptionEventType.CREATED,
@@ -55,6 +61,7 @@ const TRANSITIONS: Record<
     expire: EXPIRES,
   },
   [SubscriptionStatus.CANCELED]: {
+    resume: RESUMES,
     expire: EXPIRES,
   },
   [SubscriptionStatus.PAST_DUE]: {

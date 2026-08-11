@@ -97,3 +97,27 @@ reads the stored status to decide which.
 #### Scenario: Payment authentication completes
 - **WHEN** a renew transition is applied to a `PENDING` subscription
 - **THEN** the row reads `ACTIVE` and one `SubscriptionEvent` of type `CREATED` exists for it
+
+### Requirement: A PENDING subscription supersedes the current one
+
+Activating a `PENDING` subscription SHALL end the user's current one in the same transaction,
+resetting the subscription ledger before the new plan's allocation is granted, and SHALL create no
+replacement Free subscription. The partial unique index `Subscription_one_current_per_user` is what
+makes the ordering mandatory rather than merely tidy: the superseded row must leave the current set
+before the activating row enters it.
+
+#### Scenario: Free gives way to a paid plan
+- **WHEN** a `PENDING` paid subscription activates for a user still holding Free credits
+- **THEN** Free is `EXPIRED` recording the supersession, the subscription ledger is reset to zero,
+  the paid plan's allocation is granted, and exactly one current subscription remains
+
+### Requirement: A canceled subscription resumes
+
+The transition table SHALL carry `CANCELED + resume → ACTIVE` recording `RESUMED`, and every
+transition reaching `ACTIVE` SHALL clear `canceledAt`. A resumed subscription still carrying the
+timestamp of its cancellation reads as cancelled to anything querying that column.
+
+#### Scenario: Resumed before the period ends
+- **WHEN** a `resume` transition is applied to a `CANCELED` subscription
+- **THEN** the row reads `ACTIVE` with `canceledAt` cleared, and one `SubscriptionEvent` of type
+  `RESUMED` exists for it

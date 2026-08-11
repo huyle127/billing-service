@@ -101,6 +101,7 @@ export interface UpdateSubscriptionParams {
   priceId?: string;
   defaultPaymentMethodId?: string;
   prorationBehavior?: ProrationBehavior;
+  cancelAtPeriodEnd?: boolean;
 }
 
 export interface CancelSubscriptionParams {

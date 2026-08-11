@@ -75,7 +75,7 @@ export class SubscriptionSyncService {
     if (!local) return deferral(DEFERRALS.noLocalSubscription(localId));
     if (this.isSuperseded(local, retrieved)) return { status: SUPERSEDED };
 
-    const write = await this.stripeFieldsOf(tx, retrieved);
+    const write = await this.stripeFieldsOf(tx, local, retrieved);
 
     if (write.status !== RESOLVED) return write;
 
@@ -97,6 +97,7 @@ export class SubscriptionSyncService {
 
   private async stripeFieldsOf(
     tx: Prisma.TransactionClient,
+    local: Subscription,
     retrieved: StripeSubscription,
   ): Promise<ResolvedFields | Deferral> {
     const fields: StripeFieldWrite = {
@@ -111,6 +112,7 @@ export class SubscriptionSyncService {
     const plan = await this.plans.findByStripePriceId(tx, retrieved.priceId);
 
     if (!plan) return deferral(DEFERRALS.noPlanForPrice(retrieved.priceId));
+    if (plan.id === local.pendingPlanId) return { status: RESOLVED, fields };
 
     return { status: RESOLVED, fields: { ...fields, planId: plan.id } };
   }

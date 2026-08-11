@@ -93,6 +93,56 @@ describe('the subscription lifecycle', () => {
     });
   }
 
+  it('supersedes the current subscription when a pending one activates, forfeiting its credits', async () => {
+    const user = await prisma.user.create({
+      data: { email: `${crypto.randomUUID()}@example.test` },
+    });
+    const free = await freePlan();
+    const pro = await prisma.plan.findFirstOrThrow({ where: { code: 'pro', cycle: 'MONTHLY' } });
+
+    await prisma.creditWallet.create({
+      data: { userId: user.id, subscriptionCredits: 20, addonCredits: HELD.addon },
+    });
+
+    const current = await prisma.subscription.create({
+      data: { userId: user.id, planId: free.id, status: 'ACTIVE', cycle: FREE_PLAN.cycle },
+    });
+    const pending = await prisma.subscription.create({
+      data: {
+        userId: user.id,
+        planId: pro.id,
+        status: 'PENDING',
+        cycle: 'MONTHLY',
+        stripeSubscriptionId: `sub_${crypto.randomUUID()}`,
+      },
+    });
+
+    const outcome = await lifecycle.apply({
+      subscriptionId: pending.id,
+      event: LIFECYCLE_EVENTS.renew,
+      reason: TRANSITION_REASONS.renewed,
+      stripeEventId: 'evt_first_invoice_paid',
+      stripeStatus: 'active',
+    });
+
+    expect(outcome).toBe(APPLIED);
+    expect(await reload(current)).toMatchObject({ status: 'EXPIRED', endedAt: NOW });
+    expect(await reload(pending)).toMatchObject({ status: 'ACTIVE' });
+    expect(await wallet(pending)).toMatchObject({
+      subscriptionCredits: 0,
+      addonCredits: HELD.addon,
+    });
+    expect(await eventsOf(current)).toMatchObject([
+      { type: 'EXPIRED', reason: TRANSITION_REASONS.superseded },
+    ]);
+    expect(
+      await prisma.creditTransaction.findMany({ where: { wallet: { userId: user.id } } }),
+    ).toMatchObject([{ ledger: 'SUBSCRIPTION', type: 'RESET', amount: -20, balanceAfter: 0 }]);
+    expect(
+      await prisma.subscription.findMany({ where: { userId: user.id, status: 'ACTIVE' } }),
+    ).toMatchObject([{ id: pending.id }]);
+  });
+
   it('answers unchanged for a transition the table does not carry, writing no status and no event', async () => {
     const subscription = await aSubscriber(SubscriptionStatus.EXPIRED);
 

@@ -19,6 +19,12 @@ export const PENDING_SYNC_STATUSES = [
   SubscriptionStatus.PAST_DUE,
 ] as const;
 
+export const CURRENT_STATUSES = [
+  SubscriptionStatus.ACTIVE,
+  SubscriptionStatus.CANCELED,
+  SubscriptionStatus.PAST_DUE,
+] as const;
+
 export const CREDITABLE_STATUSES = [
   SubscriptionStatus.ACTIVE,
   SubscriptionStatus.CANCELED,
@@ -46,6 +52,8 @@ export const ALLOCATION_REASONS = {
 export const TRANSITION_REASONS = {
   activated: 'activated',
   renewed: 'renewed',
+  resumed: 'resumed',
+  superseded: 'superseded',
   canceled: 'canceled',
   pastDue: 'past_due',
   expired: 'expired',

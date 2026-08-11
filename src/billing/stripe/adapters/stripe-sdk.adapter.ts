@@ -141,6 +141,7 @@ export class StripeSdkAdapter extends StripeService {
         items,
         default_payment_method: params.defaultPaymentMethodId,
         proration_behavior: params.prorationBehavior,
+        cancel_at_period_end: params.cancelAtPeriodEnd,
       }),
     );
 
@@ -232,6 +233,14 @@ export class StripeSdkAdapter extends StripeService {
     );
 
     return this.toPaymentMethod(method);
+  }
+
+  async retrievePaymentMethod(paymentMethodId: string): Promise<StripePaymentMethod | null> {
+    const method = await this.retrieveOrNull(STRIPE_OPERATIONS.retrievePaymentMethod, () =>
+      this.client.paymentMethods.retrieve(paymentMethodId),
+    );
+
+    return method ? this.toPaymentMethod(method) : null;
   }
 
   async retrieveInvoice(invoiceId: string): Promise<StripeInvoice | null> {

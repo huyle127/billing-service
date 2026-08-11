@@ -18,6 +18,7 @@ export const STRIPE_OPERATIONS = {
   findPricesByPlanCode: 'findPricesByPlanCode',
   attachPaymentMethod: 'attachPaymentMethod',
   detachPaymentMethod: 'detachPaymentMethod',
+  retrievePaymentMethod: 'retrievePaymentMethod',
   retrieveInvoice: 'retrieveInvoice',
   createOneTimePayment: 'createOneTimePayment',
   constructWebhookEvent: 'constructWebhookEvent',

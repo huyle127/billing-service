@@ -71,21 +71,21 @@ export class InvoicePaidHandler extends WebhookHandler {
 
     if (transition === UNCHANGED) return COMPLETED;
 
+    const local = await this.settlePending(tx, synced.local);
+
     if (this.reading.owesCredits(invoice)) {
-      await this.grant(tx, synced.local, period);
+      await this.grant(tx, local, period);
     }
 
-    await this.subscriptions.writeBoundaries(tx, synced.local.id, {
+    await this.subscriptions.writeBoundaries(tx, local.id, {
       paidThroughAt: period.end,
       nextCreditAt:
-        synced.local.cycle === BillingCycle.ANNUAL
-          ? nextCreditAt(period.start, period.end)
-          : undefined,
+        local.cycle === BillingCycle.ANNUAL ? nextCreditAt(period.start, period.end) : undefined,
     });
 
     if (this.reading.movesMoney(invoice)) {
       await this.payments.recordInvoice(tx, {
-        userId: synced.local.userId,
+        userId: local.userId,
         stripeInvoiceId: invoice.id,
         status: PaymentStatus.SUCCEEDED,
         amountCents: invoice.amountPaid,
@@ -95,6 +95,20 @@ export class InvoicePaidHandler extends WebhookHandler {
     }
 
     return COMPLETED;
+  }
+
+  private settlePending(
+    tx: Prisma.TransactionClient,
+    local: Subscription,
+  ): Promise<Subscription> {
+    if (!local.pendingPlanId) return Promise.resolve(local);
+
+    return this.subscriptions.settlePendingChange(
+      tx,
+      local.id,
+      local.pendingPlanId,
+      local.pendingCycle ?? local.cycle,
+    );
   }
 
   private async grant(

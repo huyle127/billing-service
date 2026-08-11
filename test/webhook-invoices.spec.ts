@@ -219,6 +219,49 @@ describe('the invoice webhook handlers', () => {
     ).toMatchObject({ paidThroughAt: PERIOD.end, nextCreditAt: null });
   });
 
+  it('holds a downgrade until the renewal invoice, which grants the cheaper plan', async () => {
+    const { local, remote, plan } = await aSubscriber('pro');
+    const basic = await planNamed('free');
+
+    await prisma.subscription.update({
+      where: { id: local.id },
+      data: { pendingPlanId: basic.id, pendingCycle: BillingCycle.MONTHLY },
+    });
+    await stripe.updateSubscription(remote.id, {
+      priceId: basic.stripePriceId,
+      prorationBehavior: 'none',
+    });
+
+    await webhook.ingest({
+      id: `evt_${crypto.randomUUID()}`,
+      type: WEBHOOK_EVENT_TYPES.subscriptionUpdated,
+      createdAt: clock.now(),
+      apiVersion: STRIPE_API_VERSION,
+      objectId: remote.id,
+      payload: { data: { object: { id: remote.id } } },
+    });
+
+    expect(await prisma.subscription.findUniqueOrThrow({ where: { id: local.id } })).toMatchObject({
+      planId: plan.id,
+      stripePriceId: basic.stripePriceId,
+      pendingPlanId: basic.id,
+    });
+
+    const renewal = stripe.issueInvoiceFor(remote.id, {
+      billingReason: BILLING_REASONS.subscriptionCycle,
+      periodStart: PERIOD.start,
+      periodEnd: PERIOD.end,
+    });
+    await webhook.ingest(anInvoiceEvent(WEBHOOK_EVENT_TYPES.invoicePaid, renewal));
+
+    expect(await prisma.subscription.findUniqueOrThrow({ where: { id: local.id } })).toMatchObject({
+      planId: basic.id,
+      pendingPlanId: null,
+      pendingCycle: null,
+    });
+    expect(await allocationsFor(local)).toMatchObject([{ amount: basic.monthlyCredits }]);
+  });
+
   it('writes nothing at all for an invoice Stripe has not marked paid', async () => {
     const { local, remote } = await aSubscriber('pro');
     const invoice = stripe.issueInvoiceFor(remote.id, {

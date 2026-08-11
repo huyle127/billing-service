@@ -224,6 +224,7 @@ export class FakeStripeAdapter extends StripeService {
       priceId: params.priceId ?? current.priceId,
       productId: price ? price.productId : current.productId,
       currentPeriodEnd: price ? this.periodEnd(price.interval) : current.currentPeriodEnd,
+      cancelAtPeriodEnd: params.cancelAtPeriodEnd ?? current.cancelAtPeriodEnd,
     };
 
     this.subscriptions.set(subscriptionId, updated);
@@ -329,6 +330,12 @@ export class FakeStripeAdapter extends StripeService {
     }
 
     return method;
+  }
+
+  async retrievePaymentMethod(paymentMethodId: string): Promise<StripePaymentMethod | null> {
+    this.guard(STRIPE_OPERATIONS.retrievePaymentMethod);
+
+    return this.paymentMethods.get(paymentMethodId) ?? null;
   }
 
   async detachPaymentMethod(paymentMethodId: string): Promise<StripePaymentMethod> {

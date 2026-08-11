@@ -35,9 +35,29 @@ export class ProvisioningService {
   ) {}
 
   async provision(userId: string): Promise<void> {
-    const customerId = await this.ensureStripeCustomer(userId);
+    const customerId = await this.ensureCustomer(userId);
 
     await this.ensureStripeSubscription(userId, customerId);
+  }
+
+  async ensureCustomer(userId: string): Promise<string> {
+    const customer = await this.customers.findByUserId(userId);
+
+    if (!customer) throw new NotFoundError('This user has no billing customer', { userId });
+    if (customer.stripeCustomerId) return customer.stripeCustomerId;
+
+    try {
+      const stripeCustomer =
+        (await this.stripe.findCustomerByUserId(userId)) ?? (await this.createCustomer(userId));
+
+      await this.customers.attachStripeCustomer(customer.id, stripeCustomer.id);
+
+      return stripeCustomer.id;
+    } catch (error) {
+      await this.recordCustomerFailure(customer, error);
+
+      throw error;
+    }
   }
 
   async sweep(): Promise<SweepSummary> {
@@ -57,26 +77,6 @@ export class ProvisioningService {
     }
 
     return { subscriptions: claimed.length };
-  }
-
-  private async ensureStripeCustomer(userId: string): Promise<string> {
-    const customer = await this.customers.findByUserId(userId);
-
-    if (!customer) throw new NotFoundError('This user has no billing customer', { userId });
-    if (customer.stripeCustomerId) return customer.stripeCustomerId;
-
-    try {
-      const stripeCustomer =
-        (await this.stripe.findCustomerByUserId(userId)) ?? (await this.createCustomer(userId));
-
-      await this.customers.attachStripeCustomer(customer.id, stripeCustomer.id);
-
-      return stripeCustomer.id;
-    } catch (error) {
-      await this.recordCustomerFailure(customer, error);
-
-      throw error;
-    }
   }
 
   private async ensureStripeSubscription(userId: string, customerId: string): Promise<void> {

@@ -34,6 +34,11 @@ Status: `covered` · `partial` · `todo`
 | A price change never triggers credit allocation | `catalog-reconciler.service: grants no credits across a reprice and its migration` | covered |
 | Catalog is enumerated locally, never by listing Stripe products | `catalog-http: lists the local catalog and never the products living in the Stripe account` · `stripe-seam: exposes no operation that lists the Stripe catalog` | covered |
 | Plans and packages are archived, never deleted | `catalog-http: archives an unused plan in both systems, and refuses a caller without the admin role` · `catalog.service: refuses to archive a plan an active subscription points at` | covered |
+| A user subscribes to a paid plan for their own account only | `me-http: leaves the subscriber on Free while the paid subscription waits for payment` · `me-http: serves the dashboard from the database alone and refuses a body naming a user` | covered |
+| An upgrade takes effect immediately with proration | `me-http: prorates an upgrade at once and holds a downgrade until renewal` | covered |
+| A downgrade takes effect at renewal, never mid-cycle | `me-http: prorates an upgrade at once and holds a downgrade until renewal` · `webhook-invoices: holds a downgrade until the renewal invoice, which grants the cheaper plan` | covered |
+| A canceled subscription can be resumed before it expires | `me-http: cancels a paid plan and resumes it, and refuses to cancel Free at all` | covered |
+| A paid plan replaces the Free one it supersedes | `subscription-lifecycle.service: supersedes the current subscription when a pending one activates, forfeiting its credits` | covered |
 
 ## Section 5 — Payments and webhooks
 
@@ -51,6 +56,9 @@ Status: `covered` · `partial` · `todo`
 | A redelivered event is judged by its recorded status, not its existence | `webhook-http: processes a redelivered failed event again` · `webhook-http: skips a redelivered completed event and leaves exactly one row` | covered |
 | Replaying full history converges on the ordered result | `webhook-subscriptions: converges on the same rows whether the history arrives in order or shuffled` | covered |
 | Webhooks never create domain rows | `webhook-subscriptions: defers an event whose subject has no local row, and writes no subscription` · `webhook-subscriptions: attaches the Stripe id once, however often the created event is delivered` | covered |
+| Payment methods are attached and detached by their owner only | `me-http: refuses to detach the last card while a paid subscription runs, and stores no card data` | covered |
+| The last payment method cannot be detached while a paid subscription is running | `me-http: refuses to detach the last card while a paid subscription runs, and stores no card data` | covered |
+| `payment_method.attached` and `.detached` keep the local references in step | `webhook-subscriptions: records an attached payment method once and forgets it on detach, however often replayed` | covered |
 
 ## Section 6 — Credits
 
@@ -104,4 +112,4 @@ against two real callers rather than once against none.
 | --- | --- | --- |
 | Duplicate billing events handled safely | `webhook-http: skips a redelivered completed event and leaves exactly one row` | covered |
 | Subscription events recorded for reconciliation | `subscription-lifecycle.service: cancels without releasing the current slot or touching the balance` · `subscription-lifecycle.service: answers unchanged for a transition the table does not carry, writing no status and no event` | covered |
-| Sensitive payment data never stored locally | | todo |
+| Sensitive payment data never stored locally | `me-http: refuses to detach the last card while a paid subscription runs, and stores no card data` | covered |

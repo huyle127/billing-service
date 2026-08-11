@@ -62,6 +62,7 @@ enum WebhookStatus {
 enum SubscriptionEventType {
   CREATED
   RENEWED
+  RESUMED
   CANCELED
   EXPIRED
   DOWNGRADED
@@ -155,6 +156,8 @@ model Subscription {
   stripePriceId        String?
   stripeStatus         String?
   stripePeriodEnd      DateTime?
+  pendingPlanId        String?
+  pendingCycle         BillingCycle?
   syncAttempts         Int                @default(0)
   syncNextAttemptAt    DateTime           @default(now())
   syncError            String?

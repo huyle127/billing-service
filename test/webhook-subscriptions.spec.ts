@@ -169,6 +169,40 @@ describe('the subscription webhook handlers', () => {
     ).toBe(1);
   });
 
+  it('records an attached payment method once and forgets it on detach, however often replayed', async () => {
+    const { user } = await aSubscriber('pro', SubscriptionStatus.ACTIVE);
+    const customerId = `cus_${crypto.randomUUID()}`;
+    const paymentMethodId = `pm_${crypto.randomUUID()}`;
+
+    await prisma.billingCustomer.update({
+      where: { userId: user.id },
+      data: { stripeCustomerId: customerId },
+    });
+    await stripe.attachPaymentMethod({ customerId, paymentMethodId, setAsDefault: true });
+
+    for (const _ of [1, 2]) {
+      const outcome = await webhook.ingest(
+        anEvent(WEBHOOK_EVENT_TYPES.paymentMethodAttached, paymentMethodId),
+      );
+      expect(outcome.status).toBe(OUTCOME_STATUSES.completed);
+    }
+
+    expect(await prisma.paymentMethod.findMany({ where: { userId: user.id } })).toMatchObject([
+      { stripePaymentMethodId: paymentMethodId, brand: 'visa', last4: '4242', isDefault: true },
+    ]);
+
+    for (const _ of [1, 2]) {
+      const outcome = await webhook.ingest(
+        anEvent(WEBHOOK_EVENT_TYPES.paymentMethodDetached, paymentMethodId),
+      );
+      expect(outcome.status).toBe(OUTCOME_STATUSES.completed);
+    }
+
+    expect(await prisma.paymentMethod.findMany({ where: { userId: user.id } })).toMatchObject([
+      { stripePaymentMethodId: paymentMethodId, detachedAt: NOW, isDefault: false },
+    ]);
+  });
+
   it('applies the price Stripe holds over the one the payload carries, and allocates nothing', async () => {
     const { user, local } = await aSubscriber(
       'free',

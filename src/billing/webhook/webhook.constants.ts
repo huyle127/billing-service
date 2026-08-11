@@ -7,6 +7,8 @@ export const WEBHOOK_EVENT_TYPES = {
   subscriptionDeleted: 'customer.subscription.deleted',
   invoicePaid: 'invoice.paid',
   invoicePaymentFailed: 'invoice.payment_failed',
+  paymentMethodAttached: 'payment_method.attached',
+  paymentMethodDetached: 'payment_method.detached',
 } as const;
 
 export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[keyof typeof WEBHOOK_EVENT_TYPES];
@@ -32,6 +34,8 @@ export const DEFERRALS = {
   unlabelled: (objectId: string): string => `${objectId} carries no local id in its metadata`,
   noLocalSubscription: (localId: string): string => `No subscription ${localId} exists locally`,
   noLocalCustomer: (userId: string): string => `User ${userId} has no billing customer`,
+  unattached: (objectId: string): string => `${objectId} belongs to no Stripe customer`,
+  noCustomerOwner: (customerId: string): string => `No local user holds customer ${customerId}`,
   noPlanForPrice: (priceId: string): string => `No active plan is priced at ${priceId}`,
   noInvoiceSubscription: (invoiceId: string): string =>
     `Invoice ${invoiceId} names no subscription`,

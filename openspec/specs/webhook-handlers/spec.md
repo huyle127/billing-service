@@ -132,3 +132,33 @@ A handler SHALL drive the past-due transition on `invoice.payment_failed` and th
 #### Scenario: An invoice arriving after the subscription has expired
 - **WHEN** a paid invoice is processed against an already-expired subscription
 - **THEN** no `ALLOCATION` and no `PaymentTransaction` are written
+
+### Requirement: A held downgrade lands at renewal and nowhere else
+
+A paid renewal SHALL apply `pendingPlanId` and `pendingCycle` and then clear both, before credits are
+granted and before the paid-through boundary is written, so the grant and the cycle-dependent credit
+date both read the plan the subscriber is moving onto. Subscription sync SHALL NOT write `planId`
+from a retrieved price while that price belongs to the subscription's pending plan — without that
+guard, the `customer.subscription.updated` which the downgrade's own Stripe call emits would apply
+the change immediately and take away a period the subscriber has paid for.
+
+#### Scenario: The renewal grants the new plan's credits
+- **WHEN** a renewal invoice is paid for a subscription holding a pending downgrade
+- **THEN** `planId` and `cycle` take the pending values, both pending columns are cleared, and the
+  allocation is the new plan's monthly credits
+
+#### Scenario: The update event a downgrade emits
+- **WHEN** `customer.subscription.updated` arrives carrying the downgraded price
+- **THEN** `stripePriceId` and `stripeStatus` are written and `planId` is left unchanged
+
+### Requirement: Payment method events keep the local references in step
+
+`payment_method.attached` SHALL re-fetch the payment method, resolve its Stripe customer to a local
+user, and record the reference; `payment_method.detached` SHALL mark the local row detached. Both
+SHALL be idempotent under redelivery, and a repeat attach SHALL NOT rewrite `isDefault` — recomputing
+it on replay would count the stored row itself and strip the subscriber's default card.
+
+#### Scenario: A redelivered attach and a redelivered detach
+- **WHEN** each event is processed twice for the same payment method
+- **THEN** exactly one `PaymentMethod` row exists, holding its default flag, and after the detach it
+  carries a `detachedAt`

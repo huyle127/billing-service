@@ -6,6 +6,7 @@ import { CreditModule } from '../credit/credit.module';
 import { UserModule } from '../user/user.module';
 import { AddonPackageRepository } from './repositories/addon-package.repository';
 import { BillingCustomerRepository } from './repositories/billing-customer.repository';
+import { PaymentMethodRepository } from './repositories/payment-method.repository';
 import { PaymentTransactionRepository } from './repositories/payment-transaction.repository';
 import { PlanRepository } from './repositories/plan.repository';
 import { SubscriptionRepository } from './repositories/subscription.repository';
@@ -14,6 +15,10 @@ import { AdminBillingController } from './controllers/admin-billing.controller';
 import { AdminCatalogController } from './controllers/admin-catalog.controller';
 import { CatalogController } from './controllers/catalog.controller';
 import { InternalController } from './controllers/internal.controller';
+import { MePaymentMethodController } from './controllers/me-payment-method.controller';
+import { MeSubscriptionController } from './controllers/me-subscription.controller';
+import { MeSubscriptionService } from './services/me-subscription.service';
+import { PaymentMethodService } from './services/payment-method.service';
 import { AnnualAllocationSchedulerService } from './services/annual-allocation-scheduler.service';
 import { AnnualAllocationService } from './services/annual-allocation.service';
 import { AdminBillingViewService } from './services/admin-billing-view.service';
@@ -39,6 +44,8 @@ import { StripeModule } from './stripe/stripe.module';
   controllers: [
     InternalController,
     CatalogController,
+    MeSubscriptionController,
+    MePaymentMethodController,
     AdminCatalogController,
     AdminBillingController,
   ],
@@ -51,12 +58,15 @@ import { StripeModule } from './stripe/stripe.module';
     CatalogReconcilerService,
     CatalogReconcilerSchedulerService,
     EntitlementService,
+    MeSubscriptionService,
+    PaymentMethodService,
     ProvisioningService,
     ProvisioningSchedulerService,
     SubscriptionAllocationService,
     SubscriptionLifecycleService,
     PlanRepository,
     AddonPackageRepository,
+    PaymentMethodRepository,
     PaymentTransactionRepository,
     BillingCustomerRepository,
     SubscriptionRepository,
@@ -69,6 +79,7 @@ import { StripeModule } from './stripe/stripe.module';
     SubscriptionAllocationService,
     SubscriptionLifecycleService,
     PlanRepository,
+    PaymentMethodRepository,
     PaymentTransactionRepository,
     BillingCustomerRepository,
     SubscriptionRepository,

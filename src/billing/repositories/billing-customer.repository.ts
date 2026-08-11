@@ -14,6 +14,13 @@ export class BillingCustomerRepository {
     return this.prisma.billingCustomer.findUnique({ where: { userId } });
   }
 
+  findByStripeCustomerIdWithin(
+    tx: Prisma.TransactionClient,
+    stripeCustomerId: string,
+  ): Promise<BillingCustomer | null> {
+    return tx.billingCustomer.findUnique({ where: { stripeCustomerId } });
+  }
+
   findByUserIdWithin(
     tx: Prisma.TransactionClient,
     userId: string,

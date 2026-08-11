@@ -63,6 +63,11 @@ export interface AllocateRequest {
   periodStart?: Date;
 }
 
+export interface WalletView {
+  status: WalletStatus;
+  balance: LedgerBalances;
+}
+
 export interface AllocateResult {
   balance: LedgerBalances;
   transaction: LedgerRow;
@@ -191,6 +196,20 @@ export class CreditService {
     await this.wallets.setBalances(tx, wallet.id, balance);
 
     return balance;
+  }
+
+  async wallet(userId: string): Promise<WalletView> {
+    const wallet = await this.wallets.findByUserId(this.prisma, userId);
+
+    if (!wallet) throw new NotFoundError('This user has no credit wallet');
+
+    return {
+      status: wallet.status,
+      balance: {
+        subscription: wallet.subscriptionCredits,
+        addon: wallet.addonCredits,
+      },
+    };
   }
 
   async balances(userId: string): Promise<LedgerBalances> {

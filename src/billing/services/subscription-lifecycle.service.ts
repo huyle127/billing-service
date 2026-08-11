@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, Subscription, SubscriptionStatus } from '@prisma/client';
+import { Prisma, Subscription, SubscriptionEventType, SubscriptionStatus } from '@prisma/client';
 import { Clock } from '../../common/clock/clock';
 import { NotFoundError } from '../../common/errors/domain.exception';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreditService } from '../../credit/services/credit.service';
-import { FREE_PLAN, LIFECYCLE_TRANSACTION } from '../billing.constants';
+import { FREE_PLAN, LIFECYCLE_TRANSACTION, TRANSITION_REASONS } from '../billing.constants';
 import { PlanRepository } from '../repositories/plan.repository';
 import { SubscriptionRepository } from '../repositories/subscription.repository';
 import {
@@ -61,6 +61,10 @@ export class SubscriptionLifecycleService {
 
     const at = this.clock.now();
 
+    if (this.isActivation(subscription, transition)) {
+      await this.supersedeCurrent(tx, subscription, at);
+    }
+
     await this.record(tx, subscription, transition, request, at);
     await this.alignWalletWithStatus(tx, subscription, transition);
 
@@ -70,6 +74,41 @@ export class SubscriptionLifecycleService {
     }
 
     return APPLIED;
+  }
+
+  private isActivation(subscription: Subscription, transition: AppliedTransition): boolean {
+    return (
+      subscription.status === SubscriptionStatus.PENDING &&
+      transition.to === SubscriptionStatus.ACTIVE
+    );
+  }
+
+  private async supersedeCurrent(
+    tx: Prisma.TransactionClient,
+    activating: Subscription,
+    at: Date,
+  ): Promise<void> {
+    const current = await this.subscriptions.findCurrent(tx, activating.userId);
+
+    if (!current) return;
+
+    await this.subscriptions.writeStatus(tx, current.id, {
+      status: SubscriptionStatus.EXPIRED,
+      endedAt: at,
+    });
+
+    await this.subscriptions.appendEvent(tx, {
+      subscriptionId: current.id,
+      type: SubscriptionEventType.EXPIRED,
+      reason: TRANSITION_REASONS.superseded,
+      occurredAt: at,
+    });
+
+    await this.credit.reset(tx, activating.userId);
+
+    if (current.status === SubscriptionStatus.PAST_DUE) {
+      await this.credit.unfreeze(tx, activating.userId);
+    }
   }
 
   private async record(
@@ -82,7 +121,7 @@ export class SubscriptionLifecycleService {
     await this.subscriptions.writeStatus(tx, subscription.id, {
       status: transition.to,
       stripeStatus: request.stripeStatus,
-      canceledAt: transition.to === SubscriptionStatus.CANCELED ? at : undefined,
+      canceledAt: this.canceledAtFor(transition, at),
       endedAt: transition.to === SubscriptionStatus.EXPIRED ? at : undefined,
     });
 
@@ -93,6 +132,13 @@ export class SubscriptionLifecycleService {
       stripeEventId: request.stripeEventId,
       occurredAt: at,
     });
+  }
+
+  private canceledAtFor(transition: AppliedTransition, at: Date): Date | null | undefined {
+    if (transition.to === SubscriptionStatus.CANCELED) return at;
+    if (transition.to === SubscriptionStatus.ACTIVE) return null;
+
+    return undefined;
   }
 
   private async alignWalletWithStatus(

@@ -348,6 +348,58 @@ covered the table has served its purpose and can retire in favour of the specs.
   `"format": "prettier --write \"src/**/*.ts\""` and `.prettierrc` declares no `printWidth`, so
   Prettier runs at its default 80 while the code is written at 100. Anyone running `npm run format`
   reflows all of `src/`. Setting `"printWidth": 100` closes it; left for whoever decides it.
+- [029 Build the plan and add-on catalog, price changes, and subscriber migration](tickets/029-build-plan-catalog-admin.md)
+  — shipped through OpenSpec change `build-plan-catalog-admin`, archived; behaviour in
+  [`plan-catalog`](../../openspec/specs/plan-catalog/spec.md) and
+  [`admin-billing-view`](../../openspec/specs/admin-billing-view/spec.md). The first ticket to merge
+  another (030) and it shows: specs ran 90 lines against the 80 ceiling because seven clauses across
+  three capabilities land at once, argued rather than trimmed. **The price idempotency key could not
+  tell one plan's two cycles apart** — `price(code, unitAmount)` gives `pro` monthly at $20 and `pro`
+  annual at $20 the same key, and Stripe answers a repeated key with the *first* object it made, so
+  the annual Price would have come back as the monthly one. The schema had said this all along with
+  `@@unique([code, cycle])`; the key had not caught up, and it now carries the interval.
+  **`stripeProductId` is nullable and the seeded rows keep it null**, because the three plans were
+  created by hand in ticket 002 and a fabricated Product ID is worse than an absent one — it would be
+  handed to Stripe on the next `createPrice`. The visible cost is a duplicate Product when a seeded
+  code gains a cycle, which no route in this service can see. **Archiving a plan an `ACTIVE`
+  subscription points at is refused** with `409 PLAN_IN_USE`: the ticket was silent, but the
+  reconciler migrates rows to *their plan's current price*, so a plan nobody may reprice strands its
+  subscribers on a Price archived in Stripe. **Idempotent and resumable are one property, not two** —
+  the reconciler writes the new `stripePriceId` on the row it just moved, so the selection
+  `status = 'ACTIVE' AND stripePriceId <> plan.stripePriceId` clears itself and a run that dies
+  mid-batch resumes from the remainder. The reconciler's only trigger is the in-process schedule,
+  under ticket 020's rule; a third internal route would have had no caller. **The orphan report
+  cannot find every orphan** and says so: it searches Prices by the codes the local catalog already
+  knows, so a first create of a brand-new code whose database write failed leaves nothing local to
+  search by — closing that needs an intent row written before the Stripe call, which is another
+  change. 10 new tests, 196 total.
+- [031 Build subscription self-service and payment methods](tickets/031-build-subscription-self-service.md)
+  — shipped through OpenSpec change `build-subscription-self-service`; behaviour in
+  [`subscription-self-service`](../../openspec/specs/subscription-self-service/spec.md). Seven `/v1/me`
+  routes, two `payment_method` handlers, 8 tests. Four business rules were decided at propose:
+  **a paid plan activating wipes the Free credits it supersedes** rather than adding to them;
+  **an upgrade is immediate and a downgrade waits for renewal**; **Free cannot be cancelled but a
+  cancelled paid plan can be resumed**; and **the last card cannot be detached while a paid
+  subscription runs**. The downgrade is the expensive one: it needs `pendingPlanId`/`pendingCycle` on
+  `Subscription`, because the cheaper price must reach Stripe now — so the renewal bills it — while
+  `planId` must not move, since entitlement is ours and the subscriber has bought this period.
+  **Two readers of `stripePriceId` had to learn about the hold**, and both fail silently otherwise:
+  `SubscriptionSyncService` would apply the downgrade from the `customer.subscription.updated` that
+  the push itself emits, and `findMispriced` would read the deliberate mismatch as drift and migrate
+  the subscriber back onto the plan they are leaving. Superseding Free sits in the lifecycle service,
+  not the caller, so the partial unique index is satisfied by construction on every activation path;
+  it cannot reuse `expire`, whose `replaceWithFree` would mint a second current row.
+  Three things the design did not foresee: **`SubscriptionEventType` had no honest value for a
+  resume** (`RENEWED` would lie to the reconciliation trail), so `RESUMED` ships as a second
+  migration; **`retrievePaymentMethod` is a seventeenth adapter operation**, because §5's re-fetch
+  rule leaves the attach handler no other way to read brand and last4; and
+  `ensureStripeCustomer` became public `ensureCustomer`, which is what "call provisioning
+  defensively" actually means for a caller that needs the id back. Found by test: **resuming left
+  `canceledAt` set**, so a live subscription still read as cancelled to anything querying that column
+  — every transition reaching `ACTIVE` now clears it. Also found: **a handler registered in the
+  module but not in `WebhookHandlerRegistry` answers `completed` and writes nothing**, which is
+  exactly the path an unsubscribed event type takes, so nothing anywhere reports a problem.
+  8 new tests, 204 total.
 
 ## Not yet specified
 
@@ -421,13 +473,13 @@ pre-merge ticket and should be read at its successor above.
 
 Frontier (open, unblocked, unclaimed):
 
-- [031 Build subscription self-service and payment methods](tickets/031-build-subscription-self-service.md) — task — unblocked by 029 — on the critical path, 032 waits behind it
+- [032 Build add-on credit purchase](tickets/032-build-addon-purchase.md) — task — unblocked by 031
 - [033 Build billing history](tickets/033-build-billing-history.md) — task — unblocked by 026
-- [035 Decide whether imports use the `@/` path alias](tickets/035-decide-import-path-alias.md) — task — no longer cheap: 125 source files, and 031 adds more
+- [035 Decide whether imports use the `@/` path alias](tickets/035-decide-import-path-alias.md) — task — no longer cheap: 135 source files after 031, 111 of them not tests
 
 Blocked:
 
-- [032 Build add-on credit purchase](tickets/032-build-addon-purchase.md) — task — 031
+- nothing.
 
 Every build ticket names the requirement clauses it closes. Between them tickets 018–033 account for
 all 54 clauses still marked `todo` in
@@ -464,3 +516,5 @@ Closed:
 - [026 Build the webhook handlers: subscriptions, invoices, and the ordering guarantees](tickets/026-build-webhook-handlers.md) — task — merges the old 027; two OpenSpec changes, `build-webhook-subscription-handlers` and `build-webhook-invoice-handlers`, both archived; capability spec [`webhook-handlers`](../../openspec/specs/webhook-handlers/spec.md); six Section 5 clauses and five Section 6. **Corrected 2026-08-10 while preparing 028**: `nextCreditAt` advanced with `setUTCMonth(+1)` off `period.start`, which overflows a short month — an annual term starting 31 January dated the next credit at 3 March, so February's allocation key was never minted. The arithmetic moved to `src/billing/services/credit-schedule.ts`, **anchored on the day-of-month of `paidThroughAt` rather than chained off the previous value**, because chaining drifts backwards and grants a thirteenth month inside a twelve-month term. Recorded in [028](tickets/028-build-annual-allocation-cron.md), which calls that one function and mints no key of its own
 - [028 Build the annual allocation cron and the internal endpoints](tickets/028-build-annual-allocation-cron.md) — task — OpenSpec change `build-annual-allocation-cron`, archived; capability spec [`annual-allocation`](../../openspec/specs/annual-allocation/spec.md); three Section 3 clauses and the two Section 9 internal-key clauses, deferred 020 → 023 → here
 - [025 Build the subscription lifecycle state machine](tickets/025-build-subscription-lifecycle.md) — task — OpenSpec change `build-subscription-lifecycle`, archived; capability spec [`subscription-lifecycle`](../../openspec/specs/subscription-lifecycle/spec.md); two Section 3 clauses, two Section 4, one Section 6 taken over from 027, one Section 10
+- [029 Build the plan and add-on catalog, price changes, and subscriber migration](tickets/029-build-plan-catalog-admin.md) — task — merges the old 030; OpenSpec change `build-plan-catalog-admin`, archived; capability specs [`plan-catalog`](../../openspec/specs/plan-catalog/spec.md) and [`admin-billing-view`](../../openspec/specs/admin-billing-view/spec.md); seven Section 4 clauses
+- [031 Build subscription self-service and payment methods](tickets/031-build-subscription-self-service.md) — task — OpenSpec change `build-subscription-self-service`, archived; capability spec [`subscription-self-service`](../../openspec/specs/subscription-self-service/spec.md); the last Section 10 clause and the seven rows the coverage gap was missing

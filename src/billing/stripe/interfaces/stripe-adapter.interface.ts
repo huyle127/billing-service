@@ -52,6 +52,8 @@ export abstract class StripeService {
 
   abstract detachPaymentMethod(paymentMethodId: string): Promise<StripePaymentMethod>;
 
+  abstract retrievePaymentMethod(paymentMethodId: string): Promise<StripePaymentMethod | null>;
+
   abstract retrieveInvoice(invoiceId: string): Promise<StripeInvoice | null>;
 
   abstract createOneTimePayment(params: CreateOneTimePaymentParams): Promise<StripePayment>;

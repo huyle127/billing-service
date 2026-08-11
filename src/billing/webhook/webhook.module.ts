@@ -7,6 +7,8 @@ import { WebhookController } from './controllers/webhook.controller';
 import { CustomerCreatedHandler } from './handlers/customer-created.handler';
 import { InvoicePaidHandler } from './handlers/invoice-paid.handler';
 import { InvoicePaymentFailedHandler } from './handlers/invoice-payment-failed.handler';
+import { PaymentMethodAttachedHandler } from './handlers/payment-method-attached.handler';
+import { PaymentMethodDetachedHandler } from './handlers/payment-method-detached.handler';
 import { SubscriptionCreatedHandler } from './handlers/subscription-created.handler';
 import { SubscriptionDeletedHandler } from './handlers/subscription-deleted.handler';
 import { SubscriptionUpdatedHandler } from './handlers/subscription-updated.handler';
@@ -31,6 +33,8 @@ import { WebhookService } from './services/webhook.service';
     SubscriptionDeletedHandler,
     InvoicePaidHandler,
     InvoicePaymentFailedHandler,
+    PaymentMethodAttachedHandler,
+    PaymentMethodDetachedHandler,
   ],
 })
 export class WebhookModule {}
