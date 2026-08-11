@@ -60,6 +60,12 @@ export interface NewSubscriptionEvent {
 
 export type SubscriptionWithPlan = Prisma.SubscriptionGetPayload<{ include: { plan: true } }>;
 
+export interface MispricedSubscription {
+  id: string;
+  stripeSubscriptionId: string;
+  targetPriceId: string;
+}
+
 const PENDING_SYNC_SQL = Prisma.raw(
   PENDING_SYNC_STATUSES.map((status) => `'${status}'`).join(', '),
 );
@@ -110,6 +116,36 @@ export class SubscriptionRepository {
 
   async appendEvent(tx: Prisma.TransactionClient, event: NewSubscriptionEvent): Promise<void> {
     await tx.subscriptionEvent.create({ data: event });
+  }
+
+  findMispriced(batchSize: number): Promise<MispricedSubscription[]> {
+    return this.prisma.$queryRaw<MispricedSubscription[]>`
+      SELECT s."id", s."stripeSubscriptionId", p."stripePriceId" AS "targetPriceId"
+      FROM "Subscription" s
+      JOIN "Plan" p ON p."id" = s."planId"
+      WHERE s."status" = ${SubscriptionStatus.ACTIVE}::"SubscriptionStatus"
+        AND s."stripeSubscriptionId" IS NOT NULL
+        AND s."stripePriceId" IS NOT NULL
+        AND s."stripePriceId" <> p."stripePriceId"
+      ORDER BY s."id"
+      LIMIT ${batchSize}
+    `;
+  }
+
+  async writeStripePriceId(id: string, stripePriceId: string): Promise<void> {
+    await this.prisma.subscription.update({ where: { id }, data: { stripePriceId } });
+  }
+
+  countActiveByPlanId(tx: Prisma.TransactionClient, planId: string): Promise<number> {
+    return tx.subscription.count({ where: { planId, status: SubscriptionStatus.ACTIVE } });
+  }
+
+  findLatestByUserId(userId: string): Promise<SubscriptionWithPlan | null> {
+    return this.prisma.subscription.findFirst({
+      where: { userId },
+      include: { plan: true },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   findPendingByUserId(userId: string): Promise<SubscriptionWithPlan | null> {

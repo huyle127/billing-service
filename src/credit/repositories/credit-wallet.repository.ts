@@ -15,6 +15,10 @@ export class CreditWalletRepository {
     return tx.creditWallet.create({ data: { userId } });
   }
 
+  findByUserId(tx: Prisma.TransactionClient, userId: string): Promise<CreditWallet | null> {
+    return tx.creditWallet.findUnique({ where: { userId } });
+  }
+
   async lockByUserId(
     tx: Prisma.TransactionClient,
     userId: string,

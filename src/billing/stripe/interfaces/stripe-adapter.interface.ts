@@ -46,6 +46,8 @@ export abstract class StripeService {
 
   abstract archivePrice(priceId: string): Promise<StripePrice>;
 
+  abstract findPricesByPlanCode(planCode: string): Promise<StripePrice[]>;
+
   abstract attachPaymentMethod(params: AttachPaymentMethodParams): Promise<StripePaymentMethod>;
 
   abstract detachPaymentMethod(paymentMethodId: string): Promise<StripePaymentMethod>;

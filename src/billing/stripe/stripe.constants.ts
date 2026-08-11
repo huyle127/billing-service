@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { PriceInterval } from './types/stripe.types';
 
 export const STRIPE_API_VERSION = '2026-07-29.dahlia';
 
@@ -14,6 +15,7 @@ export const STRIPE_OPERATIONS = {
   createProduct: 'createProduct',
   createPrice: 'createPrice',
   archivePrice: 'archivePrice',
+  findPricesByPlanCode: 'findPricesByPlanCode',
   attachPaymentMethod: 'attachPaymentMethod',
   detachPaymentMethod: 'detachPaymentMethod',
   retrieveInvoice: 'retrieveInvoice',
@@ -34,7 +36,8 @@ export const IDEMPOTENCY_KEYS = {
   customer: (userId: string): string => `customer:${userId}`,
   subscription: (subscriptionId: string): string => `subscription:${subscriptionId}`,
   product: (planCode: string): string => `product:${planCode}`,
-  price: (planCode: string, unitAmount: number): string => `price:${planCode}:${unitAmount}`,
+  price: (planCode: string, interval: PriceInterval | null, unitAmount: number): string =>
+    `price:${planCode}:${interval ?? 'once'}:${unitAmount}`,
   payment: (purchaseId: string): string => `payment:${purchaseId}`,
 } as const;
 

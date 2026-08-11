@@ -94,6 +94,7 @@ describe('the Stripe seam', () => {
     ];
 
     expect(names.filter((name) => /^list/.test(name))).toEqual([]);
+    expect(StripeSdkAdapter.prototype.findPricesByPlanCode.length).toBe(1);
   });
 
   it('answers a missing object with null from both implementations', async () => {

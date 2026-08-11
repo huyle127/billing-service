@@ -25,6 +25,14 @@ export class AppConfigService {
     return this.config.getOrThrow<number>('allocation.batchSize');
   }
 
+  get catalogCron(): string {
+    return this.config.getOrThrow<string>('catalog.cron');
+  }
+
+  get catalogBatchSize(): number {
+    return this.config.getOrThrow<number>('catalog.batchSize');
+  }
+
   get databaseUrl(): string {
     return this.config.getOrThrow<string>('database.url');
   }

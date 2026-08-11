@@ -6,9 +6,7 @@ The boundary between this service and Stripe: which operations exist, how duplic
 prevented both inside Stripe's idempotency window and beyond it, how failures are classified for the
 callers that retry, and the guarantee that a test can substitute a fake for the whole surface. It is
 the only place the `stripe` SDK is visible; everything above it sees types this service declares.
-
 ## Requirements
-
 ### Requirement: Stripe SDK types stay inside the adapter
 
 `src/billing/stripe/` SHALL be the only location where the `stripe` package is imported and where
@@ -69,39 +67,33 @@ reach past the seam.
 - **AND** the real adapter declares the same operation with the same signature
 
 ### Requirement: The adapter never enumerates the Stripe catalog
-
-No operation SHALL list Products or Prices from Stripe. The plan and add-on catalog is read from
-this service's own database.
-
-Account `acct_1TlhMSFaNFL0w4nv` carries nine products left by earlier experiments — seven named
-`myproduct`, two named `Dahlia Verify Pro`. A list call returns objects this service has never heard
-of and cannot classify.
+No operation SHALL list Products or Prices. A Price search scoped to an exact `metadata['code']`
+value is permitted: it returns only objects this service named, and cannot reach the nine unrelated
+products in account `acct_1TlhMSFaNFL0w4nv` that a list call returns.
 
 #### Scenario: No listing operation exists to be called
-
 - **WHEN** the adapter interface is inspected for an operation that lists Products or Prices
-- **THEN** none exists
+- **THEN** none exists, and the Price search requires a plan code to match
 
 ### Requirement: Creation calls carry an idempotency key derived from our identifiers
-
-Every create call SHALL carry an `Idempotency-Key` computed from an identifier this service already
-holds — `customer:{userId}` for a Customer, `subscription:{subscriptionId}` for a Subscription, and
-the plan `code` for a catalog write. The adapter SHALL compute it; callers SHALL NOT pass one.
-
-A key computed from our own data is the same on every retry of the same logical operation, including
-a retry from a different process after a restart. A random key is not.
+Every create call SHALL carry an `Idempotency-Key` computed from an identifier this service holds —
+`customer:{userId}`, `subscription:{subscriptionId}`, and for a catalog write the plan `code` with
+its interval, since one code carries both a monthly and an annual price. The adapter SHALL compute
+it; callers SHALL NOT pass one.
 
 #### Scenario: The key is present and derived, not random
-
 - **WHEN** a Customer is created for a user
 - **THEN** the call carries the idempotency key `customer:{userId}`
 - **AND** creating a Subscription carries `subscription:{subscriptionId}`
 
 #### Scenario: A retry inside the window returns the original object
-
 - **WHEN** the same create operation is issued twice with the same derived key
 - **THEN** the second call returns the object the first created
 - **AND** no second object exists
+
+#### Scenario: Two cycles of one code do not collide
+- **WHEN** a monthly and an annual Price are created for one code at the same amount
+- **THEN** the calls carry different keys and Stripe holds two distinct Prices
 
 ### Requirement: Every created object carries our identifiers in its metadata
 
@@ -273,3 +265,4 @@ on one event receives several.
   request
 - **THEN** the first raises a retryable domain error and the second a permanent one
 - **AND** both are the same error type the real adapter raises
+

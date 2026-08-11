@@ -44,6 +44,7 @@ export const FAKE_WEBHOOK_SECRET = 'whsec_fake_signing_secret';
 export class FakeStripeAdapter extends StripeService {
   private readonly customers = new Map<string, StripeCustomer>();
   private readonly subscriptions = new Map<string, StripeSubscription>();
+  private lastUpdate: UpdateSubscriptionParams | null = null;
   private readonly products = new Map<string, StripeProduct>();
   private readonly prices = new Map<string, StripePrice>();
   private readonly paymentMethods = new Map<string, StripePaymentMethod>();
@@ -75,6 +76,10 @@ export class FakeStripeAdapter extends StripeService {
 
   expireIdempotencyKeys(): void {
     this.idempotency.clear();
+  }
+
+  lastSubscriptionUpdate(): UpdateSubscriptionParams | null {
+    return this.lastUpdate;
   }
 
   issueInvoiceFor(subscriptionId: string, overrides: Partial<StripeInvoice> = {}): StripeInvoice {
@@ -209,6 +214,8 @@ export class FakeStripeAdapter extends StripeService {
   ): Promise<StripeSubscription> {
     this.guard(STRIPE_OPERATIONS.updateSubscription);
 
+    this.lastUpdate = params;
+
     const current = this.require(this.subscriptions.get(subscriptionId), 'subscription');
     const price = params.priceId ? this.prices.get(params.priceId) : undefined;
 
@@ -263,7 +270,7 @@ export class FakeStripeAdapter extends StripeService {
   async createPrice(params: CreatePriceParams): Promise<StripePrice> {
     this.guard(STRIPE_OPERATIONS.createPrice);
 
-    const key = IDEMPOTENCY_KEYS.price(params.code, params.unitAmount);
+    const key = IDEMPOTENCY_KEYS.price(params.code, params.interval, params.unitAmount);
     const existing = this.adopt(key, this.prices);
     if (existing) return existing;
 
@@ -292,6 +299,14 @@ export class FakeStripeAdapter extends StripeService {
     this.prices.set(priceId, archived);
 
     return archived;
+  }
+
+  async findPricesByPlanCode(planCode: string): Promise<StripePrice[]> {
+    this.guard(STRIPE_OPERATIONS.findPricesByPlanCode);
+
+    return [...this.prices.values()].filter(
+      (price) => price.metadata[METADATA_KEYS.planCode] === planCode,
+    );
   }
 
   async attachPaymentMethod(params: AttachPaymentMethodParams): Promise<StripePaymentMethod> {

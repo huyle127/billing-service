@@ -214,7 +214,21 @@ deliberately not the `INSUFFICIENT_CREDITS` decline, which is a `200` response c
 
 A price change on `PATCH /v1/admin/plans/:id` creates a new Stripe Price and schedules existing
 subscribers for migration at their next renewal. It returns immediately; migration is driven by the
-state-derived reconciler described in the Plan Catalog Management section of the requirements.
+state-derived reconciler described in the Plan Catalog Management section of the requirements. That
+reconciler runs on an in-process schedule and has no route of its own — ticket 029 built it against
+the one caller it has.
+
+`DELETE /v1/admin/plans/:id` archives rather than deletes, and is refused while the plan still has
+an `ACTIVE` subscription.
+
+| Request | Response |
+| --- | --- |
+| Archive a plan an `ACTIVE` subscription points at | `409` with `PLAN_IN_USE` |
+| Archive a plan nobody is on | `200`, `active = false` locally and the Stripe Price archived |
+
+`PLAN_IN_USE` is a conflict rather than a `400`: the request was well-formed and only the state of
+other rows made it impossible. Allowing it would strand those subscribers on a Price no admin can
+reprice, which is the one thing the migration reconciler cannot repair.
 
 ## Internal endpoints
 

@@ -185,7 +185,9 @@ export class StripeSdkAdapter extends StripeService {
           recurring: params.interval ? { interval: params.interval } : undefined,
           metadata: { [METADATA_KEYS.planCode]: params.code },
         },
-        { idempotencyKey: IDEMPOTENCY_KEYS.price(params.code, params.unitAmount) },
+        {
+          idempotencyKey: IDEMPOTENCY_KEYS.price(params.code, params.interval, params.unitAmount),
+        },
       ),
     );
 
@@ -198,6 +200,14 @@ export class StripeSdkAdapter extends StripeService {
     );
 
     return this.toPrice(price);
+  }
+
+  async findPricesByPlanCode(planCode: string): Promise<StripePrice[]> {
+    const found = await this.call(STRIPE_OPERATIONS.findPricesByPlanCode, () =>
+      this.client.prices.search({ query: metadataQuery('planCode', planCode), limit: 100 }),
+    );
+
+    return found.data.map((price) => this.toPrice(price));
   }
 
   async attachPaymentMethod(params: AttachPaymentMethodParams): Promise<StripePaymentMethod> {

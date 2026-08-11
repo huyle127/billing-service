@@ -24,9 +24,13 @@ export const CREDITABLE_STATUSES = [
   SubscriptionStatus.CANCELED,
 ] as const;
 
+export const DEFAULT_CURRENCY = 'usd';
+
 export const PROVISIONING_SWEEP = 'provisioning.sweep';
 
 export const ANNUAL_ALLOCATION_SWEEP = 'allocation.annual';
+
+export const CATALOG_MIGRATION_SWEEP = 'catalog.migration';
 
 export const ALLOCATION_KEYS = {
   month: (subscriptionId: string, at: Date): string =>

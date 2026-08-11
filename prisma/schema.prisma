@@ -120,6 +120,7 @@ model Plan {
   amountCents   Int
   currency      String       @default("usd")
   stripePriceId String       @unique
+  stripeProductId String?
   active        Boolean      @default(true)
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
@@ -137,6 +138,7 @@ model AddonPackage {
   amountCents   Int
   currency      String   @default("usd")
   stripePriceId String   @unique
+  stripeProductId String?
   active        Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

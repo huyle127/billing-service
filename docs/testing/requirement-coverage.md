@@ -26,13 +26,14 @@ Status: `covered` · `partial` · `todo`
 | --- | --- | --- |
 | Lifecycle states are set by this service, not mirrored from Stripe | `subscription-transitions: carries these edges and answers unchanged for every other pair` · `subscription-lifecycle.service: answers unchanged for a transition the table does not carry, writing no status and no event` | covered |
 | Cancel keeps access until period end | `subscription-lifecycle.service: cancels without releasing the current slot or touching the balance` | covered |
-| Plan creation writes to Stripe then the database | | todo |
-| Creation calls carry a Stripe idempotency key | | todo |
-| A price change creates a new Stripe price and archives the old | | todo |
-| Existing subscribers migrate at next renewal, no proration | | todo |
-| The migration reconciler is idempotent and resumable | | todo |
-| A price change never triggers credit allocation | | todo |
-| Catalog is enumerated locally, never by listing Stripe products | | todo |
+| Plan creation writes to Stripe then the database | `catalog-reconciler.service: names a Stripe price the catalog never recorded` | covered |
+| Creation calls carry a Stripe idempotency key | `catalog.service: gives a resubmitted create one Price, and the second cycle of a code the same Product` | covered |
+| A price change creates a new Stripe price and archives the old | `catalog.service: mints a new Price on a reprice, archives the old, and repoints the plan` | covered |
+| Existing subscribers migrate at next renewal, no proration | `catalog-reconciler.service: moves a mispriced active subscription onto its plan price with no proration` | covered |
+| The migration reconciler is idempotent and resumable | `catalog-reconciler.service: finds nothing on a second run` | covered |
+| A price change never triggers credit allocation | `catalog-reconciler.service: grants no credits across a reprice and its migration` | covered |
+| Catalog is enumerated locally, never by listing Stripe products | `catalog-http: lists the local catalog and never the products living in the Stripe account` · `stripe-seam: exposes no operation that lists the Stripe catalog` | covered |
+| Plans and packages are archived, never deleted | `catalog-http: archives an unused plan in both systems, and refuses a caller without the admin role` · `catalog.service: refuses to archive a plan an active subscription points at` | covered |
 
 ## Section 5 — Payments and webhooks
 

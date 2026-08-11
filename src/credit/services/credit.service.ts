@@ -193,6 +193,14 @@ export class CreditService {
     return balance;
   }
 
+  async balances(userId: string): Promise<LedgerBalances> {
+    const wallet = await this.wallets.findByUserId(this.prisma, userId);
+
+    if (!wallet) throw new NotFoundError('This user has no credit wallet');
+
+    return { subscription: wallet.subscriptionCredits, addon: wallet.addonCredits };
+  }
+
   adjust(userId: string, amount: number, reason: string): Promise<LedgerBalances> {
     return this.prisma.$transaction(async (tx) => {
       const wallet = await this.wallets.lockByUserId(tx, userId);

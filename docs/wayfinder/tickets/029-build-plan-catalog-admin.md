@@ -3,7 +3,7 @@
 <!-- parent: map-billing-service-build.md -->
 <!-- label: wayfinder:task -->
 <!-- mode: AFK -->
-<!-- status: open -->
+<!-- status: closed (2026-08-11) -->
 <!-- assignee: -->
 <!-- output: src/billing/ -->
 <!-- blocked-by: 019, 020 -->

@@ -40,6 +40,11 @@ export const allocationConfig = registerAs('allocation', () => ({
   batchSize: integer('CREDIT_ALLOCATION_BATCH_SIZE', 50),
 }));
 
+export const catalogConfig = registerAs('catalog', () => ({
+  cron: optional('CATALOG_MIGRATION_CRON', '0 4 * * *'),
+  batchSize: integer('CATALOG_MIGRATION_BATCH_SIZE', 50),
+}));
+
 export const databaseConfig = registerAs('database', () => ({
   url: required('DATABASE_URL'),
   directUrl: required('DIRECT_URL'),
@@ -67,6 +72,7 @@ export const provisioningConfig = registerAs('provisioning', () => ({
 export const configurations = [
   appConfig,
   allocationConfig,
+  catalogConfig,
   databaseConfig,
   authConfig,
   stripeConfig,

@@ -421,14 +421,13 @@ pre-merge ticket and should be read at its successor above.
 
 Frontier (open, unblocked, unclaimed):
 
-- [029 Build the plan and add-on catalog, price changes, and subscriber migration](tickets/029-build-plan-catalog-admin.md) — task — unblocked by 020 — merges the old 030
+- [031 Build subscription self-service and payment methods](tickets/031-build-subscription-self-service.md) — task — unblocked by 029 — on the critical path, 032 waits behind it
 - [033 Build billing history](tickets/033-build-billing-history.md) — task — unblocked by 026
-- [035 Decide whether imports use the `@/` path alias](tickets/035-decide-import-path-alias.md) — task — cheapest while only twelve files exist
+- [035 Decide whether imports use the `@/` path alias](tickets/035-decide-import-path-alias.md) — task — no longer cheap: 125 source files, and 031 adds more
 
 Blocked:
 
-- [031 Build subscription self-service and payment methods](tickets/031-build-subscription-self-service.md) — task — 029
-- [032 Build add-on credit purchase](tickets/032-build-addon-purchase.md) — task — 029, 031
+- [032 Build add-on credit purchase](tickets/032-build-addon-purchase.md) — task — 031
 
 Every build ticket names the requirement clauses it closes. Between them tickets 018–033 account for
 all 54 clauses still marked `todo` in

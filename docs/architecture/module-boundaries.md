@@ -53,6 +53,16 @@ to put in it:
 controller holding business logic is the failure this prevents, and it does not become acceptable
 because there is only one route.
 
+**A controller returns a response shape declared in `dto/`, never a Prisma model.** A handler typed
+`Promise<Plan>` does not have a response contract — it publishes whatever columns the table happens
+to hold that week, so every migration silently edits the API and no reviewer sees a line to review.
+Ticket 029 is the demonstration: `stripeProductId` was added to `Plan` and appeared on the
+unauthenticated `GET /v1/plans` in the same change, decided by nobody. The shape is an interface in
+`dto/` with its mapper beside it, and a route whose audience differs declares the difference —
+a public catalog and an admin catalog are two shapes over one row, not one shape with optional
+fields. The mapping runs in the controller: choosing what leaves the process is presentation, and a
+service that shaped its own output could not serve a second caller.
+
 **A scheduler is a service under `services/`, not a role of its own.** There is no `schedulers/`
 directory: `provisioning-scheduler.service.ts` sits beside `provisioning.service.ts` and registers
 an interval that calls it. It is a separate *file* rather than an `OnModuleInit` on the service it
