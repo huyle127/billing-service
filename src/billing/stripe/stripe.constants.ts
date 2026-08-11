@@ -21,6 +21,7 @@ export const STRIPE_OPERATIONS = {
   retrievePaymentMethod: 'retrievePaymentMethod',
   retrieveInvoice: 'retrieveInvoice',
   createOneTimePayment: 'createOneTimePayment',
+  retrieveOneTimePayment: 'retrieveOneTimePayment',
   constructWebhookEvent: 'constructWebhookEvent',
 } as const;
 
@@ -64,6 +65,8 @@ export const BILLING_REASONS = {
 
 export const PAYMENT_STATUSES = {
   succeeded: 'succeeded',
+  requiresAction: 'requires_action',
+  requiresPaymentMethod: 'requires_payment_method',
 } as const;
 
 export const STRIPE_ERROR_TYPES = {

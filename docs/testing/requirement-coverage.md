@@ -59,6 +59,7 @@ Status: `covered` · `partial` · `todo`
 | Payment methods are attached and detached by their owner only | `me-http: refuses to detach the last card while a paid subscription runs, and stores no card data` | covered |
 | The last payment method cannot be detached while a paid subscription is running | `me-http: refuses to detach the last card while a paid subscription runs, and stores no card data` | covered |
 | `payment_method.attached` and `.detached` keep the local references in step | `webhook-subscriptions: records an attached payment method once and forgets it on detach, however often replayed` | covered |
+| Processing add-on credit purchase payments | `addon-purchase: records the purchase as pending and grants nothing until the webhook arrives` · `addon-purchase: marks the purchase failed and grants nothing when the intent does not succeed` | covered |
 
 ## Section 6 — Credits
 
@@ -86,6 +87,21 @@ Status: `covered` · `partial` · `todo`
 | Allocation is idempotent on subscription and month | `credit.service: grants nothing further for a repeated key and names the first row / grants twice for two keys the ledger cannot tell apart; ledger-invariants: an allocation key is spent once per ledger, as a consumption key is` | covered |
 | A renewal replaces subscription credits; unused credits do not roll over | `credit.service: lands a replacing grant on the plan amount and forfeits the remainder / does not zero a balance twice when a replacing grant is retried / adds a non-replacing grant, and refuses to replace the add-on ledger` | covered |
 | Admin adjustments target add-on credits only | `credit.service: credits and debits the add-on ledger alone, carrying the admin reason / refuses a debit larger than the add-on ledger and allows one down to zero / leaves the subscription ledger unreachable by any adjustment; credit-http: adjusts the wallet named in the path for an admin, and nobody else / refuses a malformed adjustment, a named ledger, and a debit the wallet cannot cover` | covered |
+
+## Section 7 — Add-on credit purchase
+
+| Clause | Test | Status |
+| --- | --- | --- |
+| Additional credits are purchased in fixed packages | `addon-purchase: grants the package credits and settles the payment when the intent succeeds` | covered |
+| Add-on payments are processed through Stripe | `addon-purchase: records the purchase as pending and grants nothing until the webhook arrives` | covered |
+| Credits are granted only after successful payment confirmation | `addon-purchase: records the purchase as pending and grants nothing until the webhook arrives` · `addon-purchase: marks the purchase failed and grants nothing when the intent does not succeed` | covered |
+| Add-on transactions are recorded | `addon-purchase: grants the package credits and settles the payment when the intent succeeds` · `addon-purchase: lands both grants when the same package is bought twice` | covered |
+| A purchase is refused while the wallet is frozen | `addon-purchase: refuses a frozen wallet before Stripe is called` | covered |
+| One purchase grants its credits once, however often the event is delivered | `addon-purchase: grants once when the succeeded event is redelivered under a new event id` | covered |
+
+Refundability is not tracked here: §11 excludes the refund workflow, so there is no behaviour to
+assert. The purchase is refused on a frozen wallet by this ticket's own decision, not by §7 — the
+reasoning is in the change's design note.
 
 ## Section 9 — Authentication
 

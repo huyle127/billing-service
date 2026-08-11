@@ -52,6 +52,7 @@ export class FakeStripeAdapter extends StripeService {
   private readonly payments = new Map<string, StripePayment>();
   private readonly idempotency = new Map<string, string>();
   private readonly failures = new Map<StripeOperation, FakeFailureKind[]>();
+  private readonly queuedPaymentStatuses: string[] = [];
   private sequence = 0;
 
   constructor(
@@ -69,6 +70,10 @@ export class FakeStripeAdapter extends StripeService {
     return this.subscriptions.size;
   }
 
+  get paymentCount(): number {
+    return this.payments.size;
+  }
+
   failNext(operation: StripeOperation, kind: FakeFailureKind): void {
     const queued = this.failures.get(operation) ?? [];
     this.failures.set(operation, [...queued, kind]);
@@ -76,6 +81,10 @@ export class FakeStripeAdapter extends StripeService {
 
   expireIdempotencyKeys(): void {
     this.idempotency.clear();
+  }
+
+  answerNextPaymentWith(status: string): void {
+    this.queuedPaymentStatuses.push(status);
   }
 
   lastSubscriptionUpdate(): UpdateSubscriptionParams | null {
@@ -364,7 +373,7 @@ export class FakeStripeAdapter extends StripeService {
 
     const payment: StripePayment = {
       id: this.nextId('pi'),
-      status: PAYMENT_STATUSES.succeeded,
+      status: this.takeNextPaymentStatus(),
       amount: params.amount,
       currency: params.currency,
       metadata: {
@@ -377,6 +386,12 @@ export class FakeStripeAdapter extends StripeService {
     this.idempotency.set(key, payment.id);
 
     return payment;
+  }
+
+  async retrieveOneTimePayment(paymentIntentId: string): Promise<StripePayment | null> {
+    this.guard(STRIPE_OPERATIONS.retrieveOneTimePayment);
+
+    return this.payments.get(paymentIntentId) ?? null;
   }
 
   constructWebhookEvent(rawBody: Buffer, signature: string): StripeWebhookEvent {
@@ -404,6 +419,10 @@ export class FakeStripeAdapter extends StripeService {
           STRIPE_ERROR_TYPES.invalidRequest,
           'req_fake_invalid_request',
         );
+  }
+
+  private takeNextPaymentStatus(): string {
+    return this.queuedPaymentStatuses.shift() ?? PAYMENT_STATUSES.succeeded;
   }
 
   private adopt<T>(key: string, store: Map<string, T>): T | null {

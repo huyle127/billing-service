@@ -58,5 +58,7 @@ export abstract class StripeService {
 
   abstract createOneTimePayment(params: CreateOneTimePaymentParams): Promise<StripePayment>;
 
+  abstract retrieveOneTimePayment(paymentIntentId: string): Promise<StripePayment | null>;
+
   abstract constructWebhookEvent(rawBody: Buffer, signature: string): StripeWebhookEvent;
 }

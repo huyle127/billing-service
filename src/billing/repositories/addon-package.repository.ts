@@ -7,6 +7,10 @@ export class AddonPackageRepository {
     return tx.addonPackage.findUnique({ where: { id } });
   }
 
+  findActiveByCode(tx: Prisma.TransactionClient, code: string): Promise<AddonPackage | null> {
+    return tx.addonPackage.findFirst({ where: { code, active: true } });
+  }
+
   listActive(tx: Prisma.TransactionClient): Promise<AddonPackage[]> {
     return tx.addonPackage.findMany({ where: { active: true }, orderBy: { code: 'asc' } });
   }

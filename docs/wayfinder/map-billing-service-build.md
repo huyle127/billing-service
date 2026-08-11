@@ -400,6 +400,26 @@ covered the table has served its purpose and can retire in favour of the specs.
   module but not in `WebhookHandlerRegistry` answers `completed` and writes nothing**, which is
   exactly the path an unsubscribed event type takes, so nothing anywhere reports a problem.
   8 new tests, 204 total.
+- [032 Build add-on credit purchase](tickets/032-build-addon-purchase.md)
+  — shipped through OpenSpec change `build-addon-purchase`; behaviour in
+  [`addon-purchase`](../../openspec/specs/addon-purchase/spec.md). One route, two `payment_intent`
+  handlers, 6 tests. Four business rules were decided at propose: **a PaymentIntent confirmed
+  `off_session` against the caller's stored card**, not a one-off invoice and not Checkout, which
+  gives `createOneTimePayment` the caller it has lacked since 019; **the purchase is a
+  `PaymentTransaction` row written `PENDING` before Stripe is called**, carrying `addonPackageId`, so
+  the number of credits owed lives locally rather than only in intent metadata; **`requires_action`
+  is a resting state**, leaving the row `PENDING` for the later `succeeded` event to find; and **a
+  `FROZEN` wallet is refused**, which §7 does not say — taking money for credits a `PAST_DUE` user
+  cannot spend is the wrong answer to their problem. The grant is keyed on the purchase id, never the
+  package: keying on the package would collapse a second purchase of the same package into a replay
+  of the first, and the `CreditTransaction` key is all that stands between a redelivered event and
+  credits nobody paid for. **Only the handler grants** — the request path contains no grant at all,
+  rather than a grant behind a condition, because that is §7's one rule that can lose money.
+  One thing the design did not foresee: **`retrieveOneTimePayment` is an eighteenth adapter
+  operation**, because §5's re-fetch rule means a handler may not trust the payload for the intent's
+  status or its metadata — and re-fetching is also what lets `payment_intent.payment_failed` decline
+  to mark a purchase failed once Stripe holds it as succeeded. Coverage gained a Section 7 table,
+  which had never existed.
 
 ## Not yet specified
 
@@ -473,7 +493,6 @@ pre-merge ticket and should be read at its successor above.
 
 Frontier (open, unblocked, unclaimed):
 
-- [032 Build add-on credit purchase](tickets/032-build-addon-purchase.md) — task — unblocked by 031
 - [033 Build billing history](tickets/033-build-billing-history.md) — task — unblocked by 026
 - [035 Decide whether imports use the `@/` path alias](tickets/035-decide-import-path-alias.md) — task — no longer cheap: 135 source files after 031, 111 of them not tests
 
@@ -518,3 +537,4 @@ Closed:
 - [025 Build the subscription lifecycle state machine](tickets/025-build-subscription-lifecycle.md) — task — OpenSpec change `build-subscription-lifecycle`, archived; capability spec [`subscription-lifecycle`](../../openspec/specs/subscription-lifecycle/spec.md); two Section 3 clauses, two Section 4, one Section 6 taken over from 027, one Section 10
 - [029 Build the plan and add-on catalog, price changes, and subscriber migration](tickets/029-build-plan-catalog-admin.md) — task — merges the old 030; OpenSpec change `build-plan-catalog-admin`, archived; capability specs [`plan-catalog`](../../openspec/specs/plan-catalog/spec.md) and [`admin-billing-view`](../../openspec/specs/admin-billing-view/spec.md); seven Section 4 clauses
 - [031 Build subscription self-service and payment methods](tickets/031-build-subscription-self-service.md) — task — OpenSpec change `build-subscription-self-service`, archived; capability spec [`subscription-self-service`](../../openspec/specs/subscription-self-service/spec.md); the last Section 10 clause and the seven rows the coverage gap was missing
+- [032 Build add-on credit purchase](tickets/032-build-addon-purchase.md) — task — OpenSpec change `build-addon-purchase`, archived; capability spec [`addon-purchase`](../../openspec/specs/addon-purchase/spec.md); a Section 7 table that had never existed, six rows, plus one Section 5 row

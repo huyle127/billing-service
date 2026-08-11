@@ -41,12 +41,18 @@ export const CATALOG_MIGRATION_SWEEP = 'catalog.migration';
 export const ALLOCATION_KEYS = {
   month: (subscriptionId: string, at: Date): string =>
     `sub:${subscriptionId}:${at.getUTCFullYear()}-${String(at.getUTCMonth() + 1).padStart(2, '0')}`,
+  purchase: (purchaseId: string): string => `purchase:${purchaseId}`,
 } as const;
 
 export const ALLOCATION_REASONS = {
   registration: 'registration',
   invoicePaid: 'invoice_paid',
   annualCron: 'annual_cron',
+  addonPurchased: 'addon_purchased',
+} as const;
+
+export const PURCHASE_DESCRIPTIONS = {
+  addon: (packageCode: string): string => `addon:${packageCode}`,
 } as const;
 
 export const TRANSITION_REASONS = {

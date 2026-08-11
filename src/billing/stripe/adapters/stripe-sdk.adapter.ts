@@ -271,13 +271,15 @@ export class StripeSdkAdapter extends StripeService {
       ),
     );
 
-    return {
-      id: intent.id,
-      status: intent.status,
-      amount: intent.amount,
-      currency: intent.currency,
-      metadata: this.toMetadata(intent.metadata),
-    };
+    return this.toPayment(intent);
+  }
+
+  async retrieveOneTimePayment(paymentIntentId: string): Promise<StripePayment | null> {
+    const intent = await this.retrieveOrNull(STRIPE_OPERATIONS.retrieveOneTimePayment, () =>
+      this.client.paymentIntents.retrieve(paymentIntentId),
+    );
+
+    return intent ? this.toPayment(intent) : null;
   }
 
   constructWebhookEvent(rawBody: Buffer, signature: string): StripeWebhookEvent {
@@ -390,6 +392,16 @@ export class StripeSdkAdapter extends StripeService {
       last4: method.card?.last4 ?? null,
       expMonth: method.card?.exp_month ?? null,
       expYear: method.card?.exp_year ?? null,
+    };
+  }
+
+  private toPayment(intent: Stripe.PaymentIntent): StripePayment {
+    return {
+      id: intent.id,
+      status: intent.status,
+      amount: intent.amount,
+      currency: intent.currency,
+      metadata: this.toMetadata(intent.metadata),
     };
   }
 

@@ -67,6 +67,11 @@ so a misconfiguration would destroy the development database rather than fail.
 Reference data is deliberately **not** truncated. `Plan` and `AddonPackage` are seeded once when
 the test database is created; truncating them would force every test to rebuild the catalog.
 
+**A migration reaches this database only when it is deployed against it.** `prisma migrate deploy`
+reads `DIRECT_URL`, so applying a new migration to the development database leaves `billing_test` a
+schema behind, and every test touching the new column fails with `does not exist` rather than with
+anything that names the cause. Point `DIRECT_URL` at `DIRECT_URL_TEST` for one run and deploy again.
+
 ### Why not transaction rollback per test
 
 The usual trick — open a transaction, run the test inside it, roll back — was rejected. Credit

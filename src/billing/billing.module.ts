@@ -15,8 +15,10 @@ import { AdminBillingController } from './controllers/admin-billing.controller';
 import { AdminCatalogController } from './controllers/admin-catalog.controller';
 import { CatalogController } from './controllers/catalog.controller';
 import { InternalController } from './controllers/internal.controller';
+import { MeAddonController } from './controllers/me-addon.controller';
 import { MePaymentMethodController } from './controllers/me-payment-method.controller';
 import { MeSubscriptionController } from './controllers/me-subscription.controller';
+import { AddonPurchaseService } from './services/addon-purchase.service';
 import { MeSubscriptionService } from './services/me-subscription.service';
 import { PaymentMethodService } from './services/payment-method.service';
 import { AnnualAllocationSchedulerService } from './services/annual-allocation-scheduler.service';
@@ -46,10 +48,12 @@ import { StripeModule } from './stripe/stripe.module';
     CatalogController,
     MeSubscriptionController,
     MePaymentMethodController,
+    MeAddonController,
     AdminCatalogController,
     AdminBillingController,
   ],
   providers: [
+    AddonPurchaseService,
     AnnualAllocationService,
     AnnualAllocationSchedulerService,
     InternalKeyGuard,
@@ -72,6 +76,7 @@ import { StripeModule } from './stripe/stripe.module';
     SubscriptionRepository,
   ],
   exports: [
+    AddonPackageRepository,
     CatalogService,
     CatalogReconcilerService,
     EntitlementService,

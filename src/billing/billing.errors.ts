@@ -12,3 +12,9 @@ export class PaymentMethodRequiredError extends DomainException {
     super('PAYMENT_METHOD_REQUIRED', message, HttpStatus.BAD_REQUEST, details);
   }
 }
+
+export class WalletFrozenError extends DomainException {
+  constructor(message: string, details: Record<string, unknown> = {}) {
+    super('WALLET_FROZEN', message, HttpStatus.BAD_REQUEST, details);
+  }
+}

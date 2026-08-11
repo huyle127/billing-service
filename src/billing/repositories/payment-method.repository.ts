@@ -31,6 +31,13 @@ export class PaymentMethodRepository {
     return tx.paymentMethod.count({ where: { userId, detachedAt: null } });
   }
 
+  findChargeable(userId: string): Promise<PaymentMethod | null> {
+    return this.prisma.paymentMethod.findFirst({
+      where: { userId, detachedAt: null },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+    });
+  }
+
   findAttached(userId: string, id: string): Promise<PaymentMethod | null> {
     return this.prisma.paymentMethod.findFirst({ where: { id, userId, detachedAt: null } });
   }

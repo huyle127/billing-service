@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { CustomerCreatedHandler } from './customer-created.handler';
 import { InvoicePaidHandler } from './invoice-paid.handler';
 import { InvoicePaymentFailedHandler } from './invoice-payment-failed.handler';
+import { PaymentIntentPaymentFailedHandler } from './payment-intent-payment-failed.handler';
+import { PaymentIntentSucceededHandler } from './payment-intent-succeeded.handler';
 import { PaymentMethodAttachedHandler } from './payment-method-attached.handler';
 import { PaymentMethodDetachedHandler } from './payment-method-detached.handler';
 import { SubscriptionCreatedHandler } from './subscription-created.handler';
@@ -22,6 +24,8 @@ export class WebhookHandlerRegistry {
     invoicePaymentFailed: InvoicePaymentFailedHandler,
     paymentMethodAttached: PaymentMethodAttachedHandler,
     paymentMethodDetached: PaymentMethodDetachedHandler,
+    paymentIntentSucceeded: PaymentIntentSucceededHandler,
+    paymentIntentPaymentFailed: PaymentIntentPaymentFailedHandler,
   ) {
     this.byEventType = new Map(
       [
@@ -33,6 +37,8 @@ export class WebhookHandlerRegistry {
         invoicePaymentFailed,
         paymentMethodAttached,
         paymentMethodDetached,
+        paymentIntentSucceeded,
+        paymentIntentPaymentFailed,
       ].map(
         (handler) => [handler.eventType, handler],
       ),

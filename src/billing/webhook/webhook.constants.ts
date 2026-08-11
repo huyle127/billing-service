@@ -9,6 +9,8 @@ export const WEBHOOK_EVENT_TYPES = {
   invoicePaymentFailed: 'invoice.payment_failed',
   paymentMethodAttached: 'payment_method.attached',
   paymentMethodDetached: 'payment_method.detached',
+  paymentIntentSucceeded: 'payment_intent.succeeded',
+  paymentIntentPaymentFailed: 'payment_intent.payment_failed',
 } as const;
 
 export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[keyof typeof WEBHOOK_EVENT_TYPES];
@@ -16,6 +18,8 @@ export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[keyof typeof WEBHOOK
 export const RESOLVED = 'resolved';
 
 export const SUPERSEDED = 'superseded';
+
+export const SETTLED = 'settled';
 
 export const OUTCOME_STATUSES = {
   completed: 'completed',
@@ -39,4 +43,6 @@ export const DEFERRALS = {
   noPlanForPrice: (priceId: string): string => `No active plan is priced at ${priceId}`,
   noInvoiceSubscription: (invoiceId: string): string =>
     `Invoice ${invoiceId} names no subscription`,
+  noLocalPurchase: (purchaseId: string): string => `No purchase ${purchaseId} exists locally`,
+  noPurchasePackage: (purchaseId: string): string => `Purchase ${purchaseId} names no package`,
 } as const;
