@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
-import { AuthenticatedUser } from '../../common/identity/authenticated-user';
-import { CurrentUser } from '../../common/identity/current-user.decorator';
+import { AuthenticatedUser } from '@/common/identity/authenticated-user';
+import { CurrentUser } from '@/common/identity/current-user.decorator';
 import { CreditService, WalletView } from '../services/credit.service';
 
 @Controller('me/wallet')

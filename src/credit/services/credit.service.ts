@@ -6,10 +6,10 @@ import {
   Prisma,
   WalletStatus,
 } from '@prisma/client';
-import { NotFoundError, ValidationError } from '../../common/errors/domain.exception';
-import { Metrics } from '../../common/metrics/metrics';
-import { CursorWindow } from '../../common/pagination/cursor-window';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { NotFoundError, ValidationError } from '@/common/errors/domain.exception';
+import { Metrics } from '@/common/metrics/metrics';
+import { CursorWindow } from '@/common/pagination/cursor-window';
+import { PrismaService } from '@/common/prisma/prisma.service';
 import {
   DECLINE_COUNTER,
   DECLINE_REASON_LABEL,

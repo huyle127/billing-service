@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { Role } from '@prisma/client';
-import { Roles } from '../../common/identity/roles.decorator';
+import { Roles } from '@/common/identity/roles.decorator';
 import { AdminBillingQueryDto } from '../dto/admin-billing-query.dto';
 import { AdminBillingView, AdminBillingViewService } from '../services/admin-billing-view.service';
 

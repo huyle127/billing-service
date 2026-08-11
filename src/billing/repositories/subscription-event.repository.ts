@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, SubscriptionEvent } from '@prisma/client';
-import { CursorBound, CursorWindow } from '../../common/pagination/cursor-window';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { CursorBound, CursorWindow } from '@/common/pagination/cursor-window';
+import { PrismaService } from '@/common/prisma/prisma.service';
 
 function boundOf(bound: CursorBound): Prisma.SubscriptionEventWhereInput {
   if (bound.ties === 'all') return { occurredAt: { lte: bound.at } };

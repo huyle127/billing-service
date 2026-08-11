@@ -1,8 +1,8 @@
 import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { PrismaModule } from '../../common/prisma/prisma.module';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { PrismaModule } from '@/common/prisma/prisma.module';
+import { PrismaService } from '@/common/prisma/prisma.service';
 import { UserModule } from '../user.module';
 import { UserService } from './user.service';
 

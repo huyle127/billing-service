@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { PaymentStatus, Prisma } from '@prisma/client';
-import { TRANSITION_REASONS } from '../../billing.constants';
-import { PaymentTransactionRepository } from '../../repositories/payment-transaction.repository';
-import { SubscriptionLifecycleService } from '../../services/subscription-lifecycle.service';
-import { LIFECYCLE_EVENTS, UNCHANGED } from '../../services/subscription-transitions';
-import { StripeInvoice, StripeSubscription, StripeWebhookEvent } from '../../stripe/types/stripe.types';
+import { TRANSITION_REASONS } from '@/billing/billing.constants';
+import { PaymentTransactionRepository } from '@/billing/repositories/payment-transaction.repository';
+import { SubscriptionLifecycleService } from '@/billing/services/subscription-lifecycle.service';
+import { LIFECYCLE_EVENTS, UNCHANGED } from '@/billing/services/subscription-transitions';
+import { StripeInvoice, StripeSubscription, StripeWebhookEvent } from '@/billing/stripe/types/stripe.types';
 import { InvoiceReadingService } from '../services/invoice-reading.service';
 import { SubscriptionSyncService } from '../services/subscription-sync.service';
 import { OUTCOME_STATUSES, RESOLVED, WEBHOOK_EVENT_TYPES } from '../webhook.constants';

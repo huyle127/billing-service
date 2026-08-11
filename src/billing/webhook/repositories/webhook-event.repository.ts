@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, WebhookEvent, WebhookStatus } from '@prisma/client';
-import { PrismaService } from '../../../common/prisma/prisma.service';
-import { StripeWebhookEvent } from '../../stripe/types/stripe.types';
+import { PrismaService } from '@/common/prisma/prisma.service';
+import { StripeWebhookEvent } from '@/billing/stripe/types/stripe.types';
 
 function isDuplicateStripeEventId(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';

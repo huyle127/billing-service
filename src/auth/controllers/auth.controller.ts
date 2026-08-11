@@ -1,8 +1,8 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { User } from '@prisma/client';
-import { AuthenticatedUser } from '../../common/identity/authenticated-user';
-import { CurrentUser } from '../../common/identity/current-user.decorator';
-import { Public } from '../../common/identity/public.decorator';
+import { AuthenticatedUser } from '@/common/identity/authenticated-user';
+import { CurrentUser } from '@/common/identity/current-user.decorator';
+import { Public } from '@/common/identity/public.decorator';
 import { LoginDto } from '../dto/login.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import { RegisterDto } from '../dto/register.dto';

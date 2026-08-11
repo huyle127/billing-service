@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BillingCustomer } from '@prisma/client';
-import { Clock } from '../../common/clock/clock';
-import { AppConfigService } from '../../common/config/app-config.service';
-import { NotFoundError } from '../../common/errors/domain.exception';
-import { UserService } from '../../user/services/user.service';
+import { Clock } from '@/common/clock/clock';
+import { AppConfigService } from '@/common/config/app-config.service';
+import { NotFoundError } from '@/common/errors/domain.exception';
+import { UserService } from '@/user/services/user.service';
 import { StripeService } from '../stripe/interfaces/stripe-adapter.interface';
 import { StripeCustomer } from '../stripe/types/stripe.types';
 import { BillingCustomerRepository } from '../repositories/billing-customer.repository';

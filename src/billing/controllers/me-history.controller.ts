@@ -1,6 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { AuthenticatedUser } from '../../common/identity/authenticated-user';
-import { CurrentUser } from '../../common/identity/current-user.decorator';
+import { AuthenticatedUser } from '@/common/identity/authenticated-user';
+import { CurrentUser } from '@/common/identity/current-user.decorator';
 import { HistoryQueryDto } from '../dto/history-query.dto';
 import { HistoryPage, HistoryService } from '../services/history.service';
 

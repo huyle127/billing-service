@@ -8,8 +8,8 @@ import {
   SubscriptionEvent,
   SubscriptionEventType,
 } from '@prisma/client';
-import { CursorWindow } from '../../common/pagination/cursor-window';
-import { CreditHistoryRow, CreditService } from '../../credit/services/credit.service';
+import { CursorWindow } from '@/common/pagination/cursor-window';
+import { CreditHistoryRow, CreditService } from '@/credit/services/credit.service';
 import { HISTORY_PAGE, HISTORY_SOURCES, HistorySource, SOURCE_RANK } from '../billing.constants';
 import { PaymentTransactionRepository } from '../repositories/payment-transaction.repository';
 import { SubscriptionEventRepository } from '../repositories/subscription-event.repository';

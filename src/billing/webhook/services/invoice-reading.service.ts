@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { BILLING_REASONS, INVOICE_STATUSES } from '../../stripe/stripe.constants';
-import { StripeInvoice } from '../../stripe/types/stripe.types';
+import { BILLING_REASONS, INVOICE_STATUSES } from '@/billing/stripe/stripe.constants';
+import { StripeInvoice } from '@/billing/stripe/types/stripe.types';
 
 const GRANTING_REASONS: readonly string[] = [
   BILLING_REASONS.subscriptionCreate,

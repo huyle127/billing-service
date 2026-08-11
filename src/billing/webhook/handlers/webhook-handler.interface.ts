@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { StripeWebhookEvent } from '../../stripe/types/stripe.types';
+import { StripeWebhookEvent } from '@/billing/stripe/types/stripe.types';
 import { OUTCOME_STATUSES, RESOLVED, WebhookEventType } from '../webhook.constants';
 
 export type Deferral = { status: typeof OUTCOME_STATUSES.deferred; detail: string };

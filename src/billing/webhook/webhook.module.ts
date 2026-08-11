@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ClockModule } from '../../common/clock/clock.module';
-import { PrismaModule } from '../../common/prisma/prisma.module';
-import { CreditModule } from '../../credit/credit.module';
+import { ClockModule } from '@/common/clock/clock.module';
+import { PrismaModule } from '@/common/prisma/prisma.module';
+import { CreditModule } from '@/credit/credit.module';
 import { BillingModule } from '../billing.module';
 import { StripeModule } from '../stripe/stripe.module';
 import { WebhookController } from './controllers/webhook.controller';

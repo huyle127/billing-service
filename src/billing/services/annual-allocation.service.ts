@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { Clock } from '../../common/clock/clock';
-import { AppConfigService } from '../../common/config/app-config.service';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { Clock } from '@/common/clock/clock';
+import { AppConfigService } from '@/common/config/app-config.service';
+import { PrismaService } from '@/common/prisma/prisma.service';
 import { ALLOCATION_REASONS } from '../billing.constants';
 import {
   SubscriptionRepository,

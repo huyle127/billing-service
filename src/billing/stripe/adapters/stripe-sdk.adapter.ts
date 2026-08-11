@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import Stripe from 'stripe';
-import { Clock } from '../../../common/clock/clock';
-import { AppConfigService } from '../../../common/config/app-config.service';
+import { Clock } from '@/common/clock/clock';
+import { AppConfigService } from '@/common/config/app-config.service';
 import {
   BILLING_MODES,
   IDEMPOTENCY_KEYS,

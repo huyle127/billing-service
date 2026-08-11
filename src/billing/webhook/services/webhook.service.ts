@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { WebhookStatus } from '@prisma/client';
-import { Clock } from '../../../common/clock/clock';
-import { PrismaService } from '../../../common/prisma/prisma.service';
-import { WEBHOOK_TRANSACTION } from '../../billing.constants';
-import { StripeWebhookEvent } from '../../stripe/types/stripe.types';
+import { Clock } from '@/common/clock/clock';
+import { PrismaService } from '@/common/prisma/prisma.service';
+import { WEBHOOK_TRANSACTION } from '@/billing/billing.constants';
+import { StripeWebhookEvent } from '@/billing/stripe/types/stripe.types';
 import { WebhookHandlerRegistry } from '../handlers/webhook-handler.registry';
 import { TransactionalWrite, WebhookOutcome } from '../handlers/webhook-handler.interface';
 import { WebhookEventRepository } from '../repositories/webhook-event.repository';

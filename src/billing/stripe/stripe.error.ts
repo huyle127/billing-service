@@ -1,6 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import Stripe from 'stripe';
-import { DomainException } from '../../common/errors/domain.exception';
+import { DomainException } from '@/common/errors/domain.exception';
 import { STRIPE_ERROR_TYPES, StripeOperation } from './stripe.constants';
 
 export type StripeFailureVerdict = 'retryable' | 'permanent';

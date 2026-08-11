@@ -1,6 +1,6 @@
 import { Body, Controller, Post } from '@nestjs/common';
-import { AuthenticatedUser } from '../../common/identity/authenticated-user';
-import { CurrentUser } from '../../common/identity/current-user.decorator';
+import { AuthenticatedUser } from '@/common/identity/authenticated-user';
+import { CurrentUser } from '@/common/identity/current-user.decorator';
 import { PurchaseAddonDto } from '../dto/purchase-addon.dto';
 import { AddonPurchaseService, PurchaseView } from '../services/addon-purchase.service';
 

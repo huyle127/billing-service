@@ -3,7 +3,7 @@
 <!-- parent: map-billing-service-build.md -->
 <!-- label: wayfinder:task -->
 <!-- mode: AFK -->
-<!-- status: open -->
+<!-- status: closed (2026-08-11) -->
 <!-- assignee: -->
 <!-- output: tsconfig.json, vitest.config.ts, docs/architecture/module-boundaries.md -->
 <!-- blocked-by: -->
@@ -46,3 +46,50 @@ rejected, **remove `paths` from `tsconfig.json`** so the trap is gone. Leaving i
 one outcome that is not allowed.
 
 Closes no requirement clause. Touches no schema, no configuration key, no runtime dependency.
+
+## Answer
+
+**Adopted**, through OpenSpec change `decide-import-path-alias`. 362 imports across 83 files
+converted; `npm run lint` clean, `tsc --noEmit` clean, 215 tests passing, and `node dist/main`
+booted.
+
+**The section above headed "what must be checked rather than assumed" got its own answer wrong, in
+the safe direction.** It asserted that neither `tsc` nor `nest build` rewrites path aliases and that
+a built `dist/main.js` would fail at boot. Measured on this repo:
+
+| | Emits | Runs |
+| --- | --- | --- |
+| `nest build` | `require("./billing/stripe/stripe.constants")` | yes |
+| `npx tsc -p tsconfig.build.json` | `require("@/billing/stripe/stripe.constants")` | no |
+
+The Nest CLI applies a tsconfig-paths transformer during compilation. So the alias buys **no runtime
+resolver and no dependency** — `tsc-alias`, `module-alias` and `-r tsconfig-paths/register` are all
+absent. What it buys instead is a constraint: **`npm run build` must stay `nest build`**, recorded in
+[`module-boundaries.md`](../../architecture/module-boundaries.md) beside the convention. `baseUrl`
+was the other open question and is **not needed** — `paths` with a `./src/*` target resolves against
+the tsconfig directory under TS 6.0.3, so `tsconfig.json` was not edited at all. Vitest was the one
+place the ticket called correctly: without `resolve.alias` every spec fails with
+`Cannot find package '@/…'`.
+
+**The rule is "two or more levels", not "cross-module", because the enforcing tool decides what a
+rule can mean.** `no-restricted-imports` matches the import *string* and cannot resolve a path, so it
+cannot separate `billing/webhook/handlers → ../../stripe/…` (inside `billing`) from
+`billing/services → ../../common/…` (across modules); 57 imports sat in that gap. The alternatives
+were to exempt `src/billing/**` — switching the rule off in the module holding most of the imports —
+or to enforce with a source-scanning test like `stripe-seam.spec.ts`, which resolves paths but says
+nothing in an editor. Two patterns bind it: `../../*` under `src/`, `../src/*` under `test/`, since
+a test file reaches the source tree in a single level and the first pattern would never fire there.
+
+One test, `test/import-convention.spec.ts`, and it exists for a specific reason: **a
+`no-restricted-imports` pattern that matches nothing passes silently** and the convention rots with
+nothing reporting a problem. Verified by mutation — repointing the pattern at a group that matches
+nothing turns the assertion red.
+
+**Known limit, since closed.** `test/` was outside `tsconfig.json`'s `include`, so `@/` in a spec was
+resolved by Vitest and never by `tsc`. This was left alone at first as a different change with a
+different risk; measuring it later showed the risk was one line. `test/**/*.ts` joined `include` on
+2026-08-11 and the whole suite typechecks, at the cost of a single genuine finding —
+`addon-purchase.spec.ts` caught a rejection with `.catch(error => error as DomainException)`, giving
+`thrown` the type `DomainException | PurchaseView`, so `thrown.code` was never checked against
+anything. Rewritten as `rejects.toMatchObject({ code: 'WALLET_FROZEN' })`, which also fails if the
+call resolves. `tsconfig.build.json` overrides `include` with `src/**/*`, so the build is unaffected.

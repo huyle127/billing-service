@@ -1,8 +1,8 @@
 import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { PrismaModule } from '../src/common/prisma/prisma.module';
-import { PrismaService } from '../src/common/prisma/prisma.service';
+import { PrismaModule } from '@/common/prisma/prisma.module';
+import { PrismaService } from '@/common/prisma/prisma.service';
 
 describe('ledger invariants enforced by the database', () => {
   let moduleRef: TestingModule;

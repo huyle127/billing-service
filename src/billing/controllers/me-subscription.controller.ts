@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Patch, Post } from '@nestjs/common';
-import { AuthenticatedUser } from '../../common/identity/authenticated-user';
-import { CurrentUser } from '../../common/identity/current-user.decorator';
+import { AuthenticatedUser } from '@/common/identity/authenticated-user';
+import { CurrentUser } from '@/common/identity/current-user.decorator';
 import { ChoosePlanDto } from '../dto/choose-plan.dto';
 import { MeSubscriptionService, MeSubscriptionView } from '../services/me-subscription.service';
 

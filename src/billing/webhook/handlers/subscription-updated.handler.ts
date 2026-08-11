@@ -1,12 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { TRANSITION_REASONS } from '../../billing.constants';
-import { SubscriptionLifecycleService } from '../../services/subscription-lifecycle.service';
-import { LIFECYCLE_EVENTS } from '../../services/subscription-transitions';
-import {
-  StripeSubscription,
-  StripeWebhookEvent,
-} from '../../stripe/types/stripe.types';
+import { TRANSITION_REASONS } from '@/billing/billing.constants';
+import { SubscriptionLifecycleService } from '@/billing/services/subscription-lifecycle.service';
+import { LIFECYCLE_EVENTS } from '@/billing/services/subscription-transitions';
+import { StripeSubscription, StripeWebhookEvent } from '@/billing/stripe/types/stripe.types';
 import { SubscriptionSyncService } from '../services/subscription-sync.service';
 import {
   OUTCOME_STATUSES,

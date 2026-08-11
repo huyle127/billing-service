@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PaymentStatus, Prisma } from '@prisma/client';
-import { PaymentTransactionRepository } from '../../repositories/payment-transaction.repository';
-import { PAYMENT_STATUSES } from '../../stripe/stripe.constants';
-import { StripePayment, StripeWebhookEvent } from '../../stripe/types/stripe.types';
+import { PaymentTransactionRepository } from '@/billing/repositories/payment-transaction.repository';
+import { PAYMENT_STATUSES } from '@/billing/stripe/stripe.constants';
+import { StripePayment, StripeWebhookEvent } from '@/billing/stripe/types/stripe.types';
 import { PurchaseResolutionService } from '../services/purchase-resolution.service';
 import { OUTCOME_STATUSES, RESOLVED, WEBHOOK_EVENT_TYPES } from '../webhook.constants';
 import { Resolution, WebhookHandler, WebhookOutcome } from './webhook-handler.interface';

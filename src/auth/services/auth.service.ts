@@ -3,13 +3,13 @@ import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { Prisma, User } from '@prisma/client';
 import { compare, hash } from 'bcrypt';
 import { createHash, randomUUID } from 'node:crypto';
-import { REGISTRATION_TRANSACTION } from '../../billing/billing.constants';
-import { EntitlementService } from '../../billing/services/entitlement.service';
-import { ProvisioningService } from '../../billing/services/provisioning.service';
-import { AppConfigService } from '../../common/config/app-config.service';
-import { ValidationError } from '../../common/errors/domain.exception';
-import { PrismaService } from '../../common/prisma/prisma.service';
-import { UserService } from '../../user/services/user.service';
+import { REGISTRATION_TRANSACTION } from '@/billing/billing.constants';
+import { EntitlementService } from '@/billing/services/entitlement.service';
+import { ProvisioningService } from '@/billing/services/provisioning.service';
+import { AppConfigService } from '@/common/config/app-config.service';
+import { ValidationError } from '@/common/errors/domain.exception';
+import { PrismaService } from '@/common/prisma/prisma.service';
+import { UserService } from '@/user/services/user.service';
 import { JwtPayload, TOKEN_TYPES, TokenType } from '../auth.constants';
 
 export interface TokenPair {

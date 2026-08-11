@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, User } from '@prisma/client';
-import { Clock } from '../../common/clock/clock';
-import { NotFoundError } from '../../common/errors/domain.exception';
-import { CreditService } from '../../credit/services/credit.service';
+import { Clock } from '@/common/clock/clock';
+import { NotFoundError } from '@/common/errors/domain.exception';
+import { CreditService } from '@/credit/services/credit.service';
 import { ALLOCATION_REASONS, FREE_PLAN } from '../billing.constants';
 import { BillingCustomerRepository } from '../repositories/billing-customer.repository';
 import { PlanRepository } from '../repositories/plan.repository';

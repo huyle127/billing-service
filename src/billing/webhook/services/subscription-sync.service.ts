@@ -1,17 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, Subscription } from '@prisma/client';
-import { PlanRepository } from '../../repositories/plan.repository';
+import { PlanRepository } from '@/billing/repositories/plan.repository';
 import {
   StripeFieldWrite,
   SubscriptionRepository,
-} from '../../repositories/subscription.repository';
-import { StripeService } from '../../stripe/interfaces/stripe-adapter.interface';
-import { METADATA_KEYS } from '../../stripe/stripe.constants';
+} from '@/billing/repositories/subscription.repository';
+import { StripeService } from '@/billing/stripe/interfaces/stripe-adapter.interface';
+import { METADATA_KEYS } from '@/billing/stripe/stripe.constants';
 import {
   StripeInvoice,
   StripeSubscription,
   StripeWebhookEvent,
-} from '../../stripe/types/stripe.types';
+} from '@/billing/stripe/types/stripe.types';
 import { Deferral, deferral } from '../handlers/webhook-handler.interface';
 import { DEFERRALS, RESOLVED, SUPERSEDED } from '../webhook.constants';
 

@@ -1,11 +1,11 @@
 import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { CreditModule } from '../src/credit/credit.module';
-import { ConsumeResult, CreditService } from '../src/credit/services/credit.service';
-import { MetricsModule } from '../src/common/metrics/metrics.module';
-import { PrismaModule } from '../src/common/prisma/prisma.module';
-import { PrismaService } from '../src/common/prisma/prisma.service';
+import { CreditModule } from '@/credit/credit.module';
+import { ConsumeResult, CreditService } from '@/credit/services/credit.service';
+import { MetricsModule } from '@/common/metrics/metrics.module';
+import { PrismaModule } from '@/common/prisma/prisma.module';
+import { PrismaService } from '@/common/prisma/prisma.service';
 
 const RACE_TIMEOUT = 60_000;
 const CALLERS = 30;

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { CreditLedger, Prisma } from '@prisma/client';
-import { CreditService } from '../../credit/services/credit.service';
+import { CreditService } from '@/credit/services/credit.service';
 import { ALLOCATION_KEYS } from '../billing.constants';
 
 export interface MonthlyGrant {

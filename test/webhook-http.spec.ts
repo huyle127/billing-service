@@ -3,31 +3,31 @@ import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { WebhookStatus } from '@prisma/client';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { AuthModule } from '../src/auth/auth.module';
-import { FakeStripeAdapter } from '../src/billing/stripe/adapters/fake-stripe.adapter';
-import { StripeService } from '../src/billing/stripe/interfaces/stripe-adapter.interface';
-import { STRIPE_API_VERSION } from '../src/billing/stripe/stripe.constants';
-import { signTestPayload } from '../src/billing/stripe/webhook-signature';
-import { CustomerCreatedHandler } from '../src/billing/webhook/handlers/customer-created.handler';
+import { AuthModule } from '@/auth/auth.module';
+import { FakeStripeAdapter } from '@/billing/stripe/adapters/fake-stripe.adapter';
+import { StripeService } from '@/billing/stripe/interfaces/stripe-adapter.interface';
+import { STRIPE_API_VERSION } from '@/billing/stripe/stripe.constants';
+import { signTestPayload } from '@/billing/stripe/webhook-signature';
+import { CustomerCreatedHandler } from '@/billing/webhook/handlers/customer-created.handler';
 import {
   Resolution,
   WebhookHandler,
   WebhookOutcome,
-} from '../src/billing/webhook/handlers/webhook-handler.interface';
+} from '@/billing/webhook/handlers/webhook-handler.interface';
 import {
   OUTCOME_STATUSES,
   RESOLVED,
   STRIPE_SIGNATURE_HEADER,
   WEBHOOK_EVENT_TYPES,
-} from '../src/billing/webhook/webhook.constants';
-import { WebhookModule } from '../src/billing/webhook/webhook.module';
-import { Clock } from '../src/common/clock/clock';
-import { AppConfigModule } from '../src/common/config/config.module';
-import { configurations } from '../src/common/config/configuration';
-import { DomainExceptionFilter } from '../src/common/errors/domain-exception.filter';
-import { MetricsModule } from '../src/common/metrics/metrics.module';
-import { PrismaModule } from '../src/common/prisma/prisma.module';
-import { PrismaService } from '../src/common/prisma/prisma.service';
+} from '@/billing/webhook/webhook.constants';
+import { WebhookModule } from '@/billing/webhook/webhook.module';
+import { Clock } from '@/common/clock/clock';
+import { AppConfigModule } from '@/common/config/config.module';
+import { configurations } from '@/common/config/configuration';
+import { DomainExceptionFilter } from '@/common/errors/domain-exception.filter';
+import { MetricsModule } from '@/common/metrics/metrics.module';
+import { PrismaModule } from '@/common/prisma/prisma.module';
+import { PrismaService } from '@/common/prisma/prisma.service';
 
 const DASHBOARD_SECRET = 'whsec_dashboard_secret_for_tests';
 const CLI_SECRET = 'whsec_cli_secret_for_tests';

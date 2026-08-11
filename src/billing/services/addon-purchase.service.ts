@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { PaymentStatus, WalletStatus } from '@prisma/client';
-import { Clock } from '../../common/clock/clock';
-import { NotFoundError } from '../../common/errors/domain.exception';
-import { PrismaService } from '../../common/prisma/prisma.service';
-import { CreditService } from '../../credit/services/credit.service';
+import { Clock } from '@/common/clock/clock';
+import { NotFoundError } from '@/common/errors/domain.exception';
+import { PrismaService } from '@/common/prisma/prisma.service';
+import { CreditService } from '@/credit/services/credit.service';
 import { PURCHASE_DESCRIPTIONS } from '../billing.constants';
 import { PaymentMethodRequiredError, WalletFrozenError } from '../billing.errors';
 import { AddonPackageRepository } from '../repositories/addon-package.repository';

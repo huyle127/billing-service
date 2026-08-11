@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { CreditLedger, CreditTransaction, CreditTransactionType, Prisma } from '@prisma/client';
-import { CursorBound, CursorWindow } from '../../common/pagination/cursor-window';
+import { CursorBound, CursorWindow } from '@/common/pagination/cursor-window';
 
 function boundOf(bound: CursorBound): Prisma.CreditTransactionWhereInput {
   if (bound.ties === 'all') return { createdAt: { lte: bound.at } };

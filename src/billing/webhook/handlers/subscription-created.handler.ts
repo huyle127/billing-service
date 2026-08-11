@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import {
-  StripeSubscription,
-  StripeWebhookEvent,
-} from '../../stripe/types/stripe.types';
+import { StripeSubscription, StripeWebhookEvent } from '@/billing/stripe/types/stripe.types';
 import { SubscriptionSyncService } from '../services/subscription-sync.service';
 import {
   OUTCOME_STATUSES,

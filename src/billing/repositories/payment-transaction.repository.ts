@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { AddonPackage, PaymentKind, PaymentStatus, PaymentTransaction, Prisma } from '@prisma/client';
-import { CursorBound, CursorWindow } from '../../common/pagination/cursor-window';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { CursorBound, CursorWindow } from '@/common/pagination/cursor-window';
+import { PrismaService } from '@/common/prisma/prisma.service';
 
 function boundOf(bound: CursorBound): Prisma.PaymentTransactionWhereInput {
   if (bound.ties === 'all') return { occurredAt: { lte: bound.at } };

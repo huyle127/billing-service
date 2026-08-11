@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { NotFoundError } from '../../common/errors/domain.exception';
-import { CreditService } from '../../credit/services/credit.service';
-import { LedgerBalances } from '../../credit/services/draw-split';
-import { UserService } from '../../user/services/user.service';
+import { NotFoundError } from '@/common/errors/domain.exception';
+import { CreditService } from '@/credit/services/credit.service';
+import { LedgerBalances } from '@/credit/services/draw-split';
+import { UserService } from '@/user/services/user.service';
 import { HISTORY_PAGE } from '../billing.constants';
 import { SubscriptionRepository } from '../repositories/subscription.repository';
 import { HistoryPage, HistoryService } from './history.service';

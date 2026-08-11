@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { AddonPackage, Plan } from '@prisma/client';
-import { Public } from '../../common/identity/public.decorator';
+import { Public } from '@/common/identity/public.decorator';
 import { CatalogService } from '../services/catalog.service';
 
 @Controller()

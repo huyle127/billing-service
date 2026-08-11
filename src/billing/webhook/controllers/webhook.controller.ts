@@ -9,12 +9,12 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { Clock } from '../../../common/clock/clock';
-import { AppConfigService } from '../../../common/config/app-config.service';
-import { ValidationError } from '../../../common/errors/domain.exception';
-import { Public } from '../../../common/identity/public.decorator';
-import { StripeWebhookEvent } from '../../stripe/types/stripe.types';
-import { constructEventFromSecrets } from '../../stripe/webhook-signature';
+import { Clock } from '@/common/clock/clock';
+import { AppConfigService } from '@/common/config/app-config.service';
+import { ValidationError } from '@/common/errors/domain.exception';
+import { Public } from '@/common/identity/public.decorator';
+import { StripeWebhookEvent } from '@/billing/stripe/types/stripe.types';
+import { constructEventFromSecrets } from '@/billing/stripe/webhook-signature';
 import { WebhookService } from '../services/webhook.service';
 import { OUTCOME_STATUSES, STRIPE_SIGNATURE_HEADER } from '../webhook.constants';
 

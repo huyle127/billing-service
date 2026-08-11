@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { AddonPackage, BillingCycle, Plan } from '@prisma/client';
-import { NotFoundError } from '../../common/errors/domain.exception';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { NotFoundError } from '@/common/errors/domain.exception';
+import { PrismaService } from '@/common/prisma/prisma.service';
 import { DEFAULT_CURRENCY } from '../billing.constants';
 import { PlanInUseError } from '../billing.errors';
 import { AddonPackageRepository } from '../repositories/addon-package.repository';

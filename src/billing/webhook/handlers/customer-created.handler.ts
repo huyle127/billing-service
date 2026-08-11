@@ -1,12 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { BillingCustomerRepository } from '../../repositories/billing-customer.repository';
-import { StripeService } from '../../stripe/interfaces/stripe-adapter.interface';
-import { METADATA_KEYS } from '../../stripe/stripe.constants';
-import {
-  StripeCustomer,
-  StripeWebhookEvent,
-} from '../../stripe/types/stripe.types';
+import { BillingCustomerRepository } from '@/billing/repositories/billing-customer.repository';
+import { StripeService } from '@/billing/stripe/interfaces/stripe-adapter.interface';
+import { METADATA_KEYS } from '@/billing/stripe/stripe.constants';
+import { StripeCustomer, StripeWebhookEvent } from '@/billing/stripe/types/stripe.types';
 import {
   DEFERRALS,
   OUTCOME_STATUSES,

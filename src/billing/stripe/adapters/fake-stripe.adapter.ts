@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Clock } from '../../../common/clock/clock';
+import { Clock } from '@/common/clock/clock';
 import {
   BILLING_MODES,
   BILLING_REASONS,

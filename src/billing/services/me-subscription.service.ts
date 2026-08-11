@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { BillingCycle, Plan, Prisma, SubscriptionStatus } from '@prisma/client';
-import { Clock } from '../../common/clock/clock';
-import { NotFoundError, ValidationError } from '../../common/errors/domain.exception';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { Clock } from '@/common/clock/clock';
+import { NotFoundError, ValidationError } from '@/common/errors/domain.exception';
+import { PrismaService } from '@/common/prisma/prisma.service';
 import { FREE_PLAN, LIFECYCLE_TRANSACTION, TRANSITION_REASONS } from '../billing.constants';
 import {
   SubscriptionRepository,

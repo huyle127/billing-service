@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { FixedClock } from '../../../common/clock/fixed-clock';
+import { FixedClock } from '@/common/clock/fixed-clock';
 import { FakeStripeAdapter } from './fake-stripe.adapter';
 import { StripeAdapterError } from '../stripe.error';
 

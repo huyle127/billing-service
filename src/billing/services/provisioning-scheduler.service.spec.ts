@@ -2,7 +2,7 @@ import { ScheduleModule, SchedulerRegistry } from '@nestjs/schedule';
 import { Test } from '@nestjs/testing';
 import type { TestingModule } from '@nestjs/testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AppConfigService } from '../../common/config/app-config.service';
+import { AppConfigService } from '@/common/config/app-config.service';
 import { PROVISIONING_SWEEP } from '../billing.constants';
 import { ProvisioningSchedulerService } from './provisioning-scheduler.service';
 import { ProvisioningService } from './provisioning.service';

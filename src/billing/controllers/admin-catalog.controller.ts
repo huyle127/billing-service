@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { AddonPackage, Plan, Role } from '@prisma/client';
-import { Roles } from '../../common/identity/roles.decorator';
+import { Roles } from '@/common/identity/roles.decorator';
 import { CreateAddonPackageDto } from '../dto/create-addon-package.dto';
 import { CreatePlanDto } from '../dto/create-plan.dto';
 import { UpdateAddonPackageDto } from '../dto/update-addon-package.dto';

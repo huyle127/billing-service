@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { Clock } from '../../../common/clock/clock';
-import { PaymentMethodRepository } from '../../repositories/payment-method.repository';
-import { StripeWebhookEvent } from '../../stripe/types/stripe.types';
+import { Clock } from '@/common/clock/clock';
+import { PaymentMethodRepository } from '@/billing/repositories/payment-method.repository';
+import { StripeWebhookEvent } from '@/billing/stripe/types/stripe.types';
 import { DEFERRALS, OUTCOME_STATUSES, RESOLVED, WEBHOOK_EVENT_TYPES } from '../webhook.constants';
 import { deferral, Resolution, WebhookHandler, WebhookOutcome } from './webhook-handler.interface';
 

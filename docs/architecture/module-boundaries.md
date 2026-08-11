@@ -145,6 +145,21 @@ when its subject moves.
 FakeStripeAdapter }` is checked by the compiler; `{ provide: 'STRIPE_SERVICE', ... }` is checked by
 nobody, and it forces `@Inject()` at every call site.
 
+**Distant imports go through the `@/` alias.** Under `src/`, a relative path that climbs two or more
+levels is written `@/…`; one level — `./sibling`, `../dto/thing` — stays relative, because it
+already names where it lands. Under `test/`, every reach into the source tree uses `@/`. The
+boundary is two levels rather than the module edge because ESLint matches the import string and
+cannot resolve a path, so it cannot tell `billing/webhook/handlers → ../../stripe/…` from a genuine
+cross-module hop; `../../stripe/types` is direction-blind either way. `tsconfig.json` carries
+`"paths": { "@/*": ["./src/*"] }` and needs no `baseUrl` under TypeScript 6.
+
+**`npm run build` must stay `nest build`.** This is what the alias costs, and it is not obvious.
+`tsc` does not rewrite path aliases: compiled by `tsc` alone, `dist/` keeps `require("@/…")` and the
+process dies at boot with a module-not-found. The Nest CLI applies a tsconfig-paths transformer, so
+`nest build` emits relative requires and nothing resolves the alias at runtime — no `tsc-alias`, no
+`-r tsconfig-paths/register`. Vitest is the third place and needs its own `resolve.alias` in
+`vitest.config.mts`. Ticket 035 assumed all three would need a resolver and measured otherwise.
+
 ## Names that must not be literals
 
 A string that two files must agree on is a contract, and a contract that lives in two places will

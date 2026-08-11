@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { AppConfigService } from '../../common/config/app-config.service';
+import { AppConfigService } from '@/common/config/app-config.service';
 import { CATALOG_MIGRATION_SWEEP } from '../billing.constants';
 import { CatalogReconcilerService } from './catalog-reconciler.service';
 

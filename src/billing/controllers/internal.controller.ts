@@ -1,5 +1,5 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
-import { InternalOnly } from '../../common/identity/internal-only.decorator';
+import { InternalOnly } from '@/common/identity/internal-only.decorator';
 import { RunRequestDto } from '../dto/run-request.dto';
 import {
   AllocationRunSummary,

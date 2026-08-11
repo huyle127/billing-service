@@ -446,6 +446,24 @@ covered the table has served its purpose and can retire in favour of the specs.
   ticket created; the gap is in the write path and belongs to whoever owns registration provisioning.
   4 new tests, 214 total.
 
+- [035 Decide whether imports use the `@/` path alias](tickets/035-decide-import-path-alias.md)
+  — **adopted**, through OpenSpec change `decide-import-path-alias`: 362 imports across 83 files,
+  215 tests, no requirement clause closed. **The ticket got its own hard question backwards, in the
+  safe direction.** It assumed neither `tsc` nor `nest build` rewrites path aliases and that a built
+  `dist/main.js` would die at boot; `nest build` does rewrite, via a tsconfig-paths transformer in
+  the Nest CLI, and `node dist/main` booted. So the alias costs **no resolver and no dependency** —
+  it costs a constraint instead, **`npm run build` must stay `nest build`**, which is the sentence
+  now in [`module-boundaries.md`](../architecture/module-boundaries.md). `baseUrl` is not needed
+  under TS 6 and `tsconfig.json` was not edited. **The rule is "two or more levels", not
+  "cross-module", because the enforcing tool decides what a rule can mean**: `no-restricted-imports`
+  matches the import string and cannot resolve a path, so it cannot tell
+  `billing/webhook/handlers → ../../stripe/…` from a real cross-module hop, and 57 imports sat in
+  that gap. Two patterns bind it — `../../*` under `src/`, `../src/*` under `test/`, because a test
+  file reaches the source tree in one level and the first would never fire there. The single test
+  exists because **a `no-restricted-imports` pattern that matches nothing passes silently**; verified
+  by mutation. Left deliberately: `test/` is outside `tsconfig.json`'s `include`, so `@/` there is
+  resolved by Vitest and never typechecked.
+
 ## Not yet specified
 
 - **Observability**: the logging approach for Stripe reconciliation. Narrower than it was — ticket
@@ -518,7 +536,7 @@ pre-merge ticket and should be read at its successor above.
 
 Frontier (open, unblocked, unclaimed):
 
-- [035 Decide whether imports use the `@/` path alias](tickets/035-decide-import-path-alias.md) — task — no longer cheap: 149 source files after 033, 124 of them not tests
+- nothing. Every ticket on this map is closed.
 
 Blocked:
 
@@ -563,3 +581,4 @@ Closed:
 - [031 Build subscription self-service and payment methods](tickets/031-build-subscription-self-service.md) — task — OpenSpec change `build-subscription-self-service`, archived; capability spec [`subscription-self-service`](../../openspec/specs/subscription-self-service/spec.md); the last Section 10 clause and the seven rows the coverage gap was missing
 - [032 Build add-on credit purchase](tickets/032-build-addon-purchase.md) — task — OpenSpec change `build-addon-purchase`, archived; capability spec [`addon-purchase`](../../openspec/specs/addon-purchase/spec.md); a Section 7 table that had never existed, six rows, plus one Section 5 row
 - [033 Build billing history](tickets/033-build-billing-history.md) — task — OpenSpec change `build-billing-history`, archived; capability spec [`billing-history`](../../openspec/specs/billing-history/spec.md) and a second requirement on [`admin-billing-view`](../../openspec/specs/admin-billing-view/spec.md); a Section 8 table that had never existed, three rows
+- [035 Decide whether imports use the `@/` path alias](tickets/035-decide-import-path-alias.md) — task — OpenSpec change `decide-import-path-alias`; a second requirement on [`platform`](../../openspec/specs/platform/spec.md); closes no requirement clause, the only change on this map that moves no coverage row

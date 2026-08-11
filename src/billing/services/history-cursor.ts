@@ -1,4 +1,4 @@
-import { ValidationError } from '../../common/errors/domain.exception';
+import { ValidationError } from '@/common/errors/domain.exception';
 import { HISTORY_SOURCES, HistorySource, SOURCE_RANK } from '../billing.constants';
 
 export interface HistoryPosition {

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AppConfigService } from '../../common/config/app-config.service';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { AppConfigService } from '@/common/config/app-config.service';
+import { PrismaService } from '@/common/prisma/prisma.service';
 import { AddonPackageRepository } from '../repositories/addon-package.repository';
 import { PlanRepository } from '../repositories/plan.repository';
 import { SubscriptionRepository } from '../repositories/subscription.repository';

@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { BillingCustomerRepository } from '../../repositories/billing-customer.repository';
-import { PaymentMethodRepository } from '../../repositories/payment-method.repository';
-import { StripeService } from '../../stripe/interfaces/stripe-adapter.interface';
-import { StripePaymentMethod, StripeWebhookEvent } from '../../stripe/types/stripe.types';
+import { BillingCustomerRepository } from '@/billing/repositories/billing-customer.repository';
+import { PaymentMethodRepository } from '@/billing/repositories/payment-method.repository';
+import { StripeService } from '@/billing/stripe/interfaces/stripe-adapter.interface';
+import { StripePaymentMethod, StripeWebhookEvent } from '@/billing/stripe/types/stripe.types';
 import { DEFERRALS, OUTCOME_STATUSES, RESOLVED, WEBHOOK_EVENT_TYPES } from '../webhook.constants';
 import { deferral, Resolution, WebhookHandler, WebhookOutcome } from './webhook-handler.interface';
 

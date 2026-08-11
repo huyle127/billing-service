@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PaymentMethod, Prisma } from '@prisma/client';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { PrismaService } from '@/common/prisma/prisma.service';
 
 export interface PaymentMethodReference {
   userId: string;

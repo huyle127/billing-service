@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
-import { AppConfigService } from '../../common/config/app-config.service';
+import { AppConfigService } from '@/common/config/app-config.service';
 import { PROVISIONING_SWEEP } from '../billing.constants';
 import { ProvisioningService } from './provisioning.service';
 

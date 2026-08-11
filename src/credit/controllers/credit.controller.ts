@@ -1,6 +1,6 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
-import { AuthenticatedUser } from '../../common/identity/authenticated-user';
-import { CurrentUser } from '../../common/identity/current-user.decorator';
+import { AuthenticatedUser } from '@/common/identity/authenticated-user';
+import { CurrentUser } from '@/common/identity/current-user.decorator';
 import { ConsumeCreditsDto } from '../dto/consume-credits.dto';
 import { ReverseCreditsDto } from '../dto/reverse-credits.dto';
 import { ConsumeResult, CreditService, ReverseResult } from '../services/credit.service';

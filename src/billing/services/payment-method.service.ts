@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PaymentMethod, SubscriptionStatus } from '@prisma/client';
-import { Clock } from '../../common/clock/clock';
-import { NotFoundError } from '../../common/errors/domain.exception';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { Clock } from '@/common/clock/clock';
+import { NotFoundError } from '@/common/errors/domain.exception';
+import { PrismaService } from '@/common/prisma/prisma.service';
 import { FREE_PLAN } from '../billing.constants';
 import { PaymentMethodRequiredError } from '../billing.errors';
 import { PaymentMethodRepository } from '../repositories/payment-method.repository';
