@@ -1,6 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import { AddonPackage, PaymentKind, PaymentStatus, PaymentTransaction, Prisma } from '@prisma/client';
+import { CursorBound, CursorWindow } from '../../common/pagination/cursor-window';
 import { PrismaService } from '../../common/prisma/prisma.service';
+
+function boundOf(bound: CursorBound): Prisma.PaymentTransactionWhereInput {
+  if (bound.ties === 'all') return { occurredAt: { lte: bound.at } };
+
+  if (bound.ties === 'none') return { occurredAt: { lt: bound.at } };
+
+  return {
+    OR: [{ occurredAt: { lt: bound.at } }, { occurredAt: bound.at, id: { lt: bound.id } }],
+  };
+}
+
+function windowOf(window: CursorWindow): Prisma.PaymentTransactionWhereInput[] {
+  return [
+    ...(window.from ? [{ occurredAt: { gte: window.from } }] : []),
+    ...(window.before ? [boundOf(window.before)] : []),
+  ];
+}
 
 export interface InvoicePayment {
   userId: string;
@@ -69,5 +87,13 @@ export class PaymentTransactionRepository {
     occurredAt: Date,
   ): Promise<void> {
     await tx.paymentTransaction.update({ where: { id }, data: { status, occurredAt } });
+  }
+
+  listForHistory(userId: string, window: CursorWindow): Promise<PaymentTransaction[]> {
+    return this.prisma.paymentTransaction.findMany({
+      where: { userId, AND: windowOf(window) },
+      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+      take: window.limit,
+    });
   }
 }

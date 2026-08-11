@@ -160,6 +160,12 @@ describe('the catalog over HTTP', () => {
       userId,
       subscription: { planCode: 'free', status: 'ACTIVE' },
       balances: { subscription: 50, addon: 0 },
+      history: {
+        items: [
+          { source: 'credit', ledger: 'SUBSCRIPTION', type: 'ALLOCATION', amount: 50 },
+        ],
+        nextCursor: null,
+      },
     });
   });
 });

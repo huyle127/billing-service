@@ -103,6 +103,32 @@ Refundability is not tracked here: §11 excludes the refund workflow, so there i
 assert. The purchase is refused on a frozen wallet by this ticket's own decision, not by §7 — the
 reasoning is in the change's design note.
 
+## Section 8 — Transaction history
+
+| Clause | Test | Status |
+| --- | --- | --- |
+| The system must maintain complete billing and credit history | `history-http: pages rows sharing one timestamp exactly once each, and holds a page steady against a write at the head` · `history-http: filters to one source and shows a payment at every status` | covered |
+| Billing History is a derived view over Payment Transactions, Credit Transactions, and Subscription Events | `history-http: pages rows sharing one timestamp exactly once each, and holds a page steady against a write at the head` · `catalog-http: shows one user their billing state to an admin, and to nobody else` | covered |
+| It does not duplicate events from the source ledgers | `history-http: pages rows sharing one timestamp exactly once each, and holds a page steady against a write at the head` | covered |
+
+The five "history sources" §8 lists are not five rows here. Credit allocations and consumption are
+`CreditTransaction` types and add-on purchases are `PaymentTransaction` rows with `kind = ADDON`, so
+all five reach the page through the three source ledgers the second list names, and the derived-view
+row above is what asserts them. Nothing writes to history, so there is no duplication clause to test
+beyond the merge returning each source row exactly once.
+
+The cursor is asserted separately by `history-cursor: orders rows sharing one timestamp by source
+then id, never arbitrarily` and `history-cursor: round-trips a position and refuses one naming a
+source that does not exist`. Those are not clause rows — they guard the total order that makes the
+paging assertion above meaningful.
+
+**Found while closing this section, not fixed:** registering a user writes the `ALLOCATION` credit
+row but no `CREATED` `SubscriptionEvent`, because `EntitlementService` provisions the Free
+subscription directly rather than through `subscription-transitions.ts`, which is the only writer of
+that event. A new user's history therefore shows the grant with nothing saying the subscription
+began. History reads faithfully what the ledgers hold; the gap is in the write path, and closing it
+belongs to whoever owns registration provisioning.
+
 ## Section 9 — Authentication
 
 | Clause | Test | Status |

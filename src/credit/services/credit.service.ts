@@ -8,6 +8,7 @@ import {
 } from '@prisma/client';
 import { NotFoundError, ValidationError } from '../../common/errors/domain.exception';
 import { Metrics } from '../../common/metrics/metrics';
+import { CursorWindow } from '../../common/pagination/cursor-window';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import {
   DECLINE_COUNTER,
@@ -66,6 +67,16 @@ export interface AllocateRequest {
 export interface WalletView {
   status: WalletStatus;
   balance: LedgerBalances;
+}
+
+export interface CreditHistoryRow {
+  id: string;
+  occurredAt: Date;
+  ledger: CreditLedger;
+  type: CreditTransactionType;
+  amount: number;
+  balanceAfter: number;
+  reason: string | null;
 }
 
 export interface AllocateResult {
@@ -218,6 +229,24 @@ export class CreditService {
     if (!wallet) throw new NotFoundError('This user has no credit wallet');
 
     return { subscription: wallet.subscriptionCredits, addon: wallet.addonCredits };
+  }
+
+  async history(userId: string, window: CursorWindow): Promise<CreditHistoryRow[]> {
+    const wallet = await this.wallets.findByUserId(this.prisma, userId);
+
+    if (!wallet) return [];
+
+    const rows = await this.transactions.listForHistory(this.prisma, wallet.id, window);
+
+    return rows.map((row) => ({
+      id: row.id,
+      occurredAt: row.createdAt,
+      ledger: row.ledger,
+      type: row.type,
+      amount: row.amount,
+      balanceAfter: row.balanceAfter,
+      reason: row.reason,
+    }));
   }
 
   adjust(userId: string, amount: number, reason: string): Promise<LedgerBalances> {

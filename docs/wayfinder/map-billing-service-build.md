@@ -420,6 +420,31 @@ covered the table has served its purpose and can retire in favour of the specs.
   status or its metadata — and re-fetching is also what lets `payment_intent.payment_failed` decline
   to mark a purchase failed once Stripe holds it as succeeded. Coverage gained a Section 7 table,
   which had never existed.
+- [033 Build billing history](tickets/033-build-billing-history.md)
+  — shipped through OpenSpec change `build-billing-history`; behaviour in
+  [`billing-history`](../../openspec/specs/billing-history/spec.md). One route, one admin embed, 4
+  tests. Four business rules were decided at propose: **`type` filters whole sources**, not event
+  sub-types; **payments appear at every status**, since ticket 032 leaves a row `PENDING` through
+  `requires_action`, a resting state; **the admin route embeds the first page** rather than gaining a
+  sibling; and **a row is a discriminated union on `source`**, so money cents and credit counts never
+  share a field. **The merge cannot be one `UNION ALL`** — `credit` owns `CreditTransaction` and is a
+  leaf, so `CreditService` gained a listing operation and billing merges three queries in application
+  code, over-fetching `limit + 1` per source. That is the ticket's materialization decision paying
+  out differently than expected: computed-on-read was chosen to avoid a second source of truth, and
+  the module graph then decided *how* it is computed. **`CreditTransaction` has no `occurredAt`** —
+  it is `createdAt`, mapped at projection rather than by a migration this read-only change had no
+  reason to run. The cursor is **positional, not temporal**: applied as
+  `(occurredAt, source, id) < cursor`, which is exactly why a row written at the head cannot shift
+  the next page. Verified by mutation — forcing the cursor back to time-only made page two come back
+  empty, so the assertion is not vacuous. One thing the design did not foresee: **the admin route
+  needed its own one-property DTO**, because a bare `@Query('cursor')` skips `forbidNonWhitelisted`
+  and would have silently swallowed `?type=`, which is ticket 028's finding in a new place.
+  **Found while closing, not fixed:** registration writes the `ALLOCATION` credit row but no
+  `CREATED` `SubscriptionEvent`, because `EntitlementService` provisions Free directly rather than
+  through `subscription-transitions.ts`, the only writer of that event — so a new user's history
+  shows the grant with nothing saying the subscription began. Recorded in Section 8, which this
+  ticket created; the gap is in the write path and belongs to whoever owns registration provisioning.
+  4 new tests, 214 total.
 
 ## Not yet specified
 
@@ -493,8 +518,7 @@ pre-merge ticket and should be read at its successor above.
 
 Frontier (open, unblocked, unclaimed):
 
-- [033 Build billing history](tickets/033-build-billing-history.md) — task — unblocked by 026
-- [035 Decide whether imports use the `@/` path alias](tickets/035-decide-import-path-alias.md) — task — no longer cheap: 135 source files after 031, 111 of them not tests
+- [035 Decide whether imports use the `@/` path alias](tickets/035-decide-import-path-alias.md) — task — no longer cheap: 149 source files after 033, 124 of them not tests
 
 Blocked:
 
@@ -538,3 +562,4 @@ Closed:
 - [029 Build the plan and add-on catalog, price changes, and subscriber migration](tickets/029-build-plan-catalog-admin.md) — task — merges the old 030; OpenSpec change `build-plan-catalog-admin`, archived; capability specs [`plan-catalog`](../../openspec/specs/plan-catalog/spec.md) and [`admin-billing-view`](../../openspec/specs/admin-billing-view/spec.md); seven Section 4 clauses
 - [031 Build subscription self-service and payment methods](tickets/031-build-subscription-self-service.md) — task — OpenSpec change `build-subscription-self-service`, archived; capability spec [`subscription-self-service`](../../openspec/specs/subscription-self-service/spec.md); the last Section 10 clause and the seven rows the coverage gap was missing
 - [032 Build add-on credit purchase](tickets/032-build-addon-purchase.md) — task — OpenSpec change `build-addon-purchase`, archived; capability spec [`addon-purchase`](../../openspec/specs/addon-purchase/spec.md); a Section 7 table that had never existed, six rows, plus one Section 5 row
+- [033 Build billing history](tickets/033-build-billing-history.md) — task — OpenSpec change `build-billing-history`, archived; capability spec [`billing-history`](../../openspec/specs/billing-history/spec.md) and a second requirement on [`admin-billing-view`](../../openspec/specs/admin-billing-view/spec.md); a Section 8 table that had never existed, three rows

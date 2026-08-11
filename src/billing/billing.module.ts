@@ -9,6 +9,7 @@ import { BillingCustomerRepository } from './repositories/billing-customer.repos
 import { PaymentMethodRepository } from './repositories/payment-method.repository';
 import { PaymentTransactionRepository } from './repositories/payment-transaction.repository';
 import { PlanRepository } from './repositories/plan.repository';
+import { SubscriptionEventRepository } from './repositories/subscription-event.repository';
 import { SubscriptionRepository } from './repositories/subscription.repository';
 import { InternalKeyGuard } from '../common/identity/internal-key.guard';
 import { AdminBillingController } from './controllers/admin-billing.controller';
@@ -16,6 +17,7 @@ import { AdminCatalogController } from './controllers/admin-catalog.controller';
 import { CatalogController } from './controllers/catalog.controller';
 import { InternalController } from './controllers/internal.controller';
 import { MeAddonController } from './controllers/me-addon.controller';
+import { MeHistoryController } from './controllers/me-history.controller';
 import { MePaymentMethodController } from './controllers/me-payment-method.controller';
 import { MeSubscriptionController } from './controllers/me-subscription.controller';
 import { AddonPurchaseService } from './services/addon-purchase.service';
@@ -28,6 +30,7 @@ import { CatalogReconcilerSchedulerService } from './services/catalog-reconciler
 import { CatalogReconcilerService } from './services/catalog-reconciler.service';
 import { CatalogService } from './services/catalog.service';
 import { EntitlementService } from './services/entitlement.service';
+import { HistoryService } from './services/history.service';
 import { ProvisioningSchedulerService } from './services/provisioning-scheduler.service';
 import { ProvisioningService } from './services/provisioning.service';
 import { SubscriptionAllocationService } from './services/subscription-allocation.service';
@@ -49,6 +52,7 @@ import { StripeModule } from './stripe/stripe.module';
     MeSubscriptionController,
     MePaymentMethodController,
     MeAddonController,
+    MeHistoryController,
     AdminCatalogController,
     AdminBillingController,
   ],
@@ -62,6 +66,7 @@ import { StripeModule } from './stripe/stripe.module';
     CatalogReconcilerService,
     CatalogReconcilerSchedulerService,
     EntitlementService,
+    HistoryService,
     MeSubscriptionService,
     PaymentMethodService,
     ProvisioningService,
@@ -74,6 +79,7 @@ import { StripeModule } from './stripe/stripe.module';
     PaymentTransactionRepository,
     BillingCustomerRepository,
     SubscriptionRepository,
+    SubscriptionEventRepository,
   ],
   exports: [
     AddonPackageRepository,

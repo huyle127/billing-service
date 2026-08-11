@@ -1,13 +1,4 @@
-# admin-billing-view
-
-## Purpose
-
-The one route that reads another user's billing state: subscription, wallet balances, and a page of
-their history, answered from local rows alone so it works while Stripe is unreachable. Every other
-billing read takes its subject from the token; this one takes it from the path, which is why it is
-the one that requires the admin role.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: An admin reads one user's billing state from local rows
 `GET /v1/admin/users/:userId/billing` SHALL answer with that user's subscription, wallet balances,

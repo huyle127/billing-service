@@ -55,6 +55,22 @@ export const PURCHASE_DESCRIPTIONS = {
   addon: (packageCode: string): string => `addon:${packageCode}`,
 } as const;
 
+export const HISTORY_SOURCES = ['payment', 'credit', 'subscription'] as const;
+
+export type HistorySource = (typeof HISTORY_SOURCES)[number];
+
+export const SOURCE_RANK: Record<HistorySource, number> = {
+  payment: 0,
+  credit: 1,
+  subscription: 2,
+};
+
+export const HISTORY_PAGE = {
+  defaultLimit: 25,
+  maxLimit: 100,
+  adminLimit: 20,
+} as const;
+
 export const TRANSITION_REASONS = {
   activated: 'activated',
   renewed: 'renewed',

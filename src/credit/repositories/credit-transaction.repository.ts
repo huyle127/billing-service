@@ -1,5 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import { CreditLedger, CreditTransaction, CreditTransactionType, Prisma } from '@prisma/client';
+import { CursorBound, CursorWindow } from '../../common/pagination/cursor-window';
+
+function boundOf(bound: CursorBound): Prisma.CreditTransactionWhereInput {
+  if (bound.ties === 'all') return { createdAt: { lte: bound.at } };
+
+  if (bound.ties === 'none') return { createdAt: { lt: bound.at } };
+
+  return {
+    OR: [{ createdAt: { lt: bound.at } }, { createdAt: bound.at, id: { lt: bound.id } }],
+  };
+}
+
+function windowOf(window: CursorWindow): Prisma.CreditTransactionWhereInput[] {
+  return [
+    ...(window.from ? [{ createdAt: { gte: window.from } }] : []),
+    ...(window.before ? [boundOf(window.before)] : []),
+  ];
+}
 
 export interface NewLedgerRow {
   walletId: string;
@@ -46,5 +64,17 @@ export class CreditTransactionRepository {
     reversesIds: string[],
   ): Promise<CreditTransaction[]> {
     return tx.creditTransaction.findMany({ where: { reversesId: { in: reversesIds } } });
+  }
+
+  listForHistory(
+    tx: Prisma.TransactionClient,
+    walletId: string,
+    window: CursorWindow,
+  ): Promise<CreditTransaction[]> {
+    return tx.creditTransaction.findMany({
+      where: { walletId, AND: windowOf(window) },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: window.limit,
+    });
   }
 }
